@@ -17,6 +17,11 @@ typedef struct {
 
 typedef enum { T_FILE, T_DIRECTORY } inode_type;
 
+
+// Ex.1 10 blocos com referências diretas
+// dir_entry_t* x[10];
+// ponteiro para bloco de índices - tabela de referências para até n  = 1024 / sizeof(block*)
+// não é preciso para root 
 /*
  * I-node
  */

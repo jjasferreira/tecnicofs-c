@@ -78,14 +78,14 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len);
  */
 ssize_t tfs_read(int fhandle, void *buffer, size_t len);
 
+// Ex.2
 /* Copies the contents of a file that exists in TecnicoFS to the contents
  * of another file in the OS' file system tree (outside TecnicoFS).
- * Devolve 0 em caso de sucesso, -1 em caso de erro.
+ * Returns 0 if successful, -1 otherwise.
  * * Input:
  *      - path name of the source file (from TecnicoFS)
  *      - path name of the destination file (in the main file system), which 
- *.       is created it needed, and overwritten if it already exists
- *.     Returns 0 if successful, -1 otherwise.
+ *.       is created if needed, and overwritten if it already exists
 */ 
 int tfs_copy_to_external_fs(char const *source_path, char const *dest_path);
 

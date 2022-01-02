@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// @foo operations.c é como o warehouse manager e o state.c é o warehouse em si. 
+// Ex.3 É preciso rever sincronização fina, mutexes e rwlocks
+
 int tfs_init() {
     state_init();
 
@@ -54,7 +57,7 @@ int tfs_open(char const *name, int flags) {
             return -1;
         }
 
-        /* Trucate (if requested) */
+        /* Truncate (if requested) */
         if (flags & TFS_O_TRUNC) {
             if (inode->i_size > 0) {
                 if (data_block_free(inode->i_data_block) == -1) {
