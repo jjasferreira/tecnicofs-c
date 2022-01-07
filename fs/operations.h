@@ -47,6 +47,7 @@ int tfs_lookup(char const *name);
  *    - append mode (TFS_O_APPEND)
  *    - truncate file contents (TFS_O_TRUNC)
  *    - create file if it does not exist (TFS_O_CREAT)
+ * @foo Returns file handle
  */
 int tfs_open(char const *name, int flags);
 

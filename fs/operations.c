@@ -10,7 +10,8 @@
 int tfs_init() {
     state_init();
 
-    /* create root inode */
+    /* create root inode. @foo This is the only time T_DIRECTORY is passed as a parameter 
+    (the FS only has one directory, everything else is a file) */
     int root = inode_create(T_DIRECTORY);
     if (root != ROOT_DIR_INUM) {
         return -1;

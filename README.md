@@ -6,7 +6,7 @@ LEIC-A/LEIC-T/LETI, DEI/IST/ULisboa 2021-22
 
 Consultar o enunciado publicado no site da disciplina.
 
-Pesquisar por @foo para informações gerais.
+Pesquisar por @foo para informações para explicações não originais.
 
 Pesquisar por Ex.1/Ex.2/Ex.3 para informações sobre exercícios.
 

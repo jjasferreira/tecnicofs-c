@@ -19,6 +19,7 @@ static char free_blocks[DATA_BLOCKS];
 
 /* Volatile FS state */
 
+// @foo This table keeps track of all open files and for each file stores the current cursor position
 static open_file_entry_t open_file_table[MAX_OPEN_FILES];
 static char free_open_file_entries[MAX_OPEN_FILES];
 
