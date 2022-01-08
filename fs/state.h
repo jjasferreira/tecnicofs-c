@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#define MAX_SUPPL_REFS (BLOCK_SIZE / sizeof(int))
+
 /*
  * Directory entry
  */
@@ -18,21 +20,25 @@ typedef struct {
 
 typedef enum { T_FILE, T_DIRECTORY } inode_type;
 
+/*
+ * Ex.1 Set of indexes pointing to data blocks. Allocated if need be when tfs_write is called.
+ */
+typedef struct {
+    int indexes[MAX_SUPPL_REFS];
+} i_block;
 
-// Ex.1 10 blocos com referências diretas
-// dir_entry_t* x[10];
-// ponteiro para bloco de índices - tabela de referências para até n  = 1024 / sizeof(block*)
-// não é preciso para root 
 /*
  * I-node
  */
 typedef struct {
     inode_type i_node_type;
     size_t i_size;
-    // @foo only exists if inode_type == T_DIRECTORY
+    int i_data_blocks[MAX_DIRECT_REFS];
     int i_data_block;
+    i_block* i_block;
     /* in a real FS, more fields would exist here */
 } inode_t;
+
 
 typedef enum { FREE = 0, TAKEN = 1 } allocation_state_t;
 
@@ -59,7 +65,11 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name);
 int find_in_dir(int inumber, char const *sub_name);
 
 int data_block_alloc();
-int data_block_free(int block_number);
+int data_block_free(inode_t* inode);
+//TODO
+i_block* i_block_alloc();
+int i_block_free(i_block* iblock);
+
 void *data_block_get(int block_number);
 
 int add_to_open_file_table(int inumber, size_t offset);

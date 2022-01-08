@@ -44,7 +44,22 @@ FUNCTION 5 - tfs_close(fhandle) -> return remove_from_open_file_table(fhandle)
 
 FUNCTION 6 - tfs_write(fhandle, void const* buffer /*content to write*/, size_t len /*length of the content*/) -> returns the number of bytes written
             tfs_write() -> file = get_open_file_entry(fhandle);
-            inode_get();
+            inode_get(file->of_inumber);
             if contents don't fit, the number of bytes to write is equal to the block size minus the offset of the file;
-            (TO BE CONTINUED...)
+            if there is something to write:
+                if empty file, allocate new block -> data_block_alloc();
+                block = data_block_get(inode->i_data_block)
+                memcpy /*actual write*/
+                increment the offset
+            return to_write
+
+FUNCTION 7 - tfs_read(fhandle, void* buffer /*destination buffer*/, size_t len /*length of the buffer*/)
+            tfs_read() -> /*same as write*/ file = get_open_file_entry(fhandle);
+            inode_get(file->of_inumber);
+            if contents don't fit, the number of bytes to read is equal to the block size minus the offset of the file;
+            if there is something to read:
+                block = data_block_get(inode->i_data_block)
+                memcpy to buffer
+                increment the offset, but why?
+            return to_read
             

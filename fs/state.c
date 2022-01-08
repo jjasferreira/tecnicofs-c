@@ -1,4 +1,5 @@
 #include "state.h"
+#include "config.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -127,6 +128,15 @@ int inode_create(inode_type n_type) {
                 /* In case of a new file, simply sets its size to 0 */
                 inode_table[inumber].i_size = 0;
                 inode_table[inumber].i_data_block = -1;
+                int b[MAX_DIRECT_REFS];
+                for (int i = 0; i < MAX_DIRECT_REFS; i++) {
+                    b[i] = data_block_alloc();
+                    if (b[i] == -1) {
+                        freeinode_ts[inumber] = FREE;
+                        return -1;
+                    }
+                }
+                inode_table[inumber].i_block = NULL;
             }
             return inumber;
         }
@@ -152,7 +162,7 @@ int inode_delete(int inumber) {
     freeinode_ts[inumber] = FREE;
 
     if (inode_table[inumber].i_size > 0) {
-        if (data_block_free(inode_table[inumber].i_data_block) == -1) {
+        if (data_block_free(&inode_table[inumber]) == -1) {
             return -1;
         }
     }
@@ -268,16 +278,37 @@ int data_block_alloc() {
 
 /* Frees a data block
  * Input
- * 	- the block index
+ * 	- the inode
  * Returns: 0 if success, -1 otherwise
  */
-int data_block_free(int block_number) {
-    if (!valid_block_number(block_number)) {
-        return -1;
-    }
+int data_block_free(inode_t* inode) {
+    if (inode->i_node_type == T_DIRECTORY) {
+        if (!valid_block_number(inode->i_data_block)) {
+            return -1;
+        }
 
-    insert_delay(); // simulate storage access delay to free_blocks
-    free_blocks[block_number] = FREE;
+        insert_delay(); // simulate storage access delay to free_blocks
+        free_blocks[inode->i_data_block] = FREE;
+        return 0;
+    }
+    else {
+        for (int i = 0; i < MAX_DIRECT_REFS; ++i) {
+            if (!valid_block_number(inode->i_data_blocks[i])) {
+            return -1;
+            }
+
+            insert_delay(); // simulate storage access delay to free_blocks
+            free_blocks[inode->i_data_blocks[i]] = FREE;
+        }
+        if (inode->i_block != NULL) {
+            i_block_free(inode->i_block);
+        }
+        return 0;
+    }
+}
+
+//TODO (stub)
+int i_block_free(i_block *iblock) {
     return 0;
 }
 

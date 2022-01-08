@@ -61,10 +61,15 @@ int tfs_open(char const *name, int flags) {
         /* Truncate (if requested) */
         if (flags & TFS_O_TRUNC) {
             if (inode->i_size > 0) {
-                if (data_block_free(inode->i_data_block) == -1) {
+                if (data_block_free(inode) == -1) {
                     return -1;
                 }
                 inode->i_size = 0;
+            }
+            if (inode->i_block != NULL) {
+                if (i_block_free(inode->i_block) == -1) {
+                    return -1;
+                }
             }
         }
         /* Determine initial offset */
@@ -115,14 +120,16 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     }
 
     /* Determine how many bytes to write */
-    if (to_write + file->of_offset > BLOCK_SIZE) {
-        to_write = BLOCK_SIZE - file->of_offset;
+    if (to_write + file->of_offset > ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE)) {
+        to_write = ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE) - file->of_offset;
     }
 
     if (to_write > 0) {
-        if (inode->i_size == 0) {
+        if (inode->i_size + to_write > MAX_DIRECT_REFS * BLOCK_SIZE) {
             /* If empty file, allocate new block */
-            inode->i_data_block = data_block_alloc();
+            inode->i_block = i_block_alloc();
+                if (inode->i_block == NULL) 
+            return -1;
         }
 
         void *block = data_block_get(inode->i_data_block);
