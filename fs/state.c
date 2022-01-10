@@ -170,6 +170,10 @@ int inode_delete(int inumber) {
     return 0;
 }
 
+void* i_block_get(int index, i_block* iblock) {
+    return &iblock[index];
+}
+
 /*
  * Returns a pointer to an existing i-node.
  * Input:

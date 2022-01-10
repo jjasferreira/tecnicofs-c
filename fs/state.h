@@ -34,7 +34,7 @@ typedef struct {
     inode_type i_node_type;
     size_t i_size;
     int i_data_blocks[MAX_DIRECT_REFS];
-    int i_data_block;
+    int i_data_block; // only for directories
     i_block* i_block;
     /* in a real FS, more fields would exist here */
 } inode_t;
@@ -69,6 +69,8 @@ int data_block_free(inode_t* inode);
 //TODO
 i_block* i_block_alloc();
 int i_block_free(i_block* iblock);
+// Receives an index and an iblock and returns the data block in that index
+void* i_block_get(int index, i_block* iblock);
 
 void *data_block_get(int block_number);
 

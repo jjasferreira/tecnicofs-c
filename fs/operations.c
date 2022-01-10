@@ -1,4 +1,7 @@
 #include "operations.h"
+#include "config.h"
+#include "state.h"
+#include "math.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -124,30 +127,59 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         to_write = ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE) - file->of_offset;
     }
 
+    int dir_refs, suppl_refs;
+    int write_times = (to_write / BLOCK_SIZE) + 1;
+    int remainder = to_write % BLOCK_SIZE;
+
+    //TODO macro para ficar bonitito
+    if (MAX_DIRECT_REFS < write_times)
+        dir_refs = MAX_DIRECT_REFS;
+    else dir_refs = write_times;
+
+    if (write_times > MAX_DIRECT_REFS)
+        suppl_refs = write_times - MAX_DIRECT_REFS;
+
     if (to_write > 0) {
         if (inode->i_size + to_write > MAX_DIRECT_REFS * BLOCK_SIZE) {
             /* If empty file, allocate new block */
             inode->i_block = i_block_alloc();
-                if (inode->i_block == NULL) 
-            return -1;
+            if (inode->i_block == NULL)
+                return -1;
         }
 
-        void *block = data_block_get(inode->i_data_block);
-        if (block == NULL) {
-            return -1;
-        }
+        // TODO juntar estes dois ciclos num só
+        for (int i = 0; i < dir_refs; i++, write_times--) {
+            // TODO get data block from direct refs if i <10, from iblock elsewise
+            void* block = data_block_get(inode->i_data_blocks[i]);
+            if (block == NULL)
+                return -1;
 
+            int write = (write_times == 1) ? remainder : BLOCK_SIZE;
+                /* Perform the actual write */
+                memcpy(block + file->of_offset, buffer, write);
+                file->of_offset += write;
+        }
+        for (int i = 0; i < suppl_refs; i++, write_times--) {
+            void* block = i_block_get(i, inode->i_block);
+            if (block == NULL)
+                return -1;
+            if (write_times == 1) {
+                memcpy(block + file->of_offset, buffer, remainder);
+                file->of_offset += remainder;
+            } else {
+                memcpy(block + file->of_offset, buffer, BLOCK_SIZE);
+                file->of_offset += BLOCK_SIZE;
+            }
+        }
         /* Perform the actual write */
-        memcpy(block + file->of_offset, buffer, to_write);
 
         /* The offset associated with the file handle is
-         * incremented accordingly */
+         * incremented accordingly
         file->of_offset += to_write;
         if (file->of_offset > inode->i_size) {
             inode->i_size = file->of_offset;
-        }
+        } TODO is this needed?*/
     }
-
     return (ssize_t)to_write;
 }
 
