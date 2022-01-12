@@ -64,7 +64,7 @@ int tfs_open(char const *name, int flags) {
         /* Truncate (if requested) */
         if (flags & TFS_O_TRUNC) {
             if (inode->i_size > 0) {
-                if (data_block_free(inode) == -1) {
+                if (data_blocks_free(inode) == -1) {
                     return -1;
                 }
                 inode->i_size = 0;
@@ -127,9 +127,9 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         to_write = ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE) - file->of_offset;
     }
 
-    int dir_refs, suppl_refs;
-    int write_times = (to_write / BLOCK_SIZE) + 1;
-    int remainder = to_write % BLOCK_SIZE;
+    int dir_refs, suppl_refs = 0;
+    int write_times = (int) (to_write / BLOCK_SIZE) + 1;
+    size_t remainder = to_write % BLOCK_SIZE;
 
     //TODO macro para ficar bonitito
     if (MAX_DIRECT_REFS < write_times)
@@ -154,7 +154,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             if (block == NULL)
                 return -1;
 
-            int write = (write_times == 1) ? remainder : BLOCK_SIZE;
+            size_t write = (write_times == 1) ? remainder : BLOCK_SIZE;
                 /* Perform the actual write */
                 memcpy(block + file->of_offset, buffer, write);
                 file->of_offset += write;
@@ -202,13 +202,13 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         to_read = len;
     }
 
-    int pre_trunc = file->of_offset % BLOCK_SIZE;
-    int post_trunc = to_read % BLOCK_SIZE;
+    size_t pre_trunc = file->of_offset % BLOCK_SIZE;
+    size_t post_trunc = to_read % BLOCK_SIZE;
 
     if (to_read > 0) {
-        int read_times = (file->of_offset / BLOCK_SIZE) + 1;
+        size_t read_times = (file->of_offset / BLOCK_SIZE) + 1;
         for (int i = 0; i < read_times; i++) {
-            void* block = (i >= 10) ? 
+            void* block = (i < 10) ? 
             data_block_get(inode->i_data_blocks[i]) : 
             i_block_get(i, inode->i_block);
             if (block == NULL) {

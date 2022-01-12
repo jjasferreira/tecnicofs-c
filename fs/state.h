@@ -65,8 +65,8 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name);
 int find_in_dir(int inumber, char const *sub_name);
 
 int data_block_alloc();
-int data_block_free(inode_t* inode);
-//TODO
+int data_blocks_free(inode_t* inode);
+int data_block_free(int block_number);
 i_block* i_block_alloc();
 int i_block_free(i_block* iblock);
 // Receives an index and an iblock and returns the data block in that index

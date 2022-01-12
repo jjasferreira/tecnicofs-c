@@ -162,7 +162,7 @@ int inode_delete(int inumber) {
     freeinode_ts[inumber] = FREE;
 
     if (inode_table[inumber].i_size > 0) {
-        if (data_block_free(&inode_table[inumber]) == -1) {
+        if (data_blocks_free(&inode_table[inumber]) == -1) {
             return -1;
         }
     }
@@ -265,7 +265,6 @@ int find_in_dir(int inumber, char const *sub_name) {
 /*
  * Allocated a new data block
  * Returns: block index if successful, -1 otherwise
- * TODO this is wrong, i variable conflicts
  */
 int data_block_alloc() {
     for (int i = 0; i < DATA_BLOCKS; i++) {
@@ -283,10 +282,25 @@ int data_block_alloc() {
 
 /* Frees a data block
  * Input
+ * 	- the block index
+ * Returns: 0 if success, -1 otherwise
+ */
+int data_block_free(int block_number) {
+    if (!valid_block_number(block_number)) {
+        return -1;
+    }
+
+    insert_delay(); // simulate storage access delay to free_blocks
+    free_blocks[block_number] = FREE;
+    return 0;
+}
+
+/* Frees one or more data blocks
+ * Input
  * 	- the inode
  * Returns: 0 if success, -1 otherwise
  */
-int data_block_free(inode_t* inode) {
+int data_blocks_free(inode_t* inode) {
     if (inode->i_node_type == T_DIRECTORY) {
         if (!valid_block_number(inode->i_data_block)) {
             return -1;
@@ -297,7 +311,10 @@ int data_block_free(inode_t* inode) {
         return 0;
     }
     else {
-        for (int i = 0; i < MAX_DIRECT_REFS; ++i) {
+        int taken_blocks = (int) (inode->i_size / BLOCK_SIZE) + 1;
+        if (taken_blocks > MAX_DIRECT_REFS)
+            taken_blocks = MAX_DIRECT_REFS;
+        for (int i = 0; i < taken_blocks; ++i) {
             if (!valid_block_number(inode->i_data_blocks[i])) {
             return -1;
             }
@@ -312,16 +329,27 @@ int data_block_free(inode_t* inode) {
     }
 }
 
+/* Allocates an i_block. Returns a pointer to the i_block. */
+
 i_block* i_block_alloc() {
     i_block* b =  malloc(sizeof(i_block));
-    int ind[MAX_SUPPL_REFS];
     for (int i = 0; i < MAX_SUPPL_REFS; i++) {
-
+        b->indexes[i] = data_block_alloc();
     }
+    return b;
 }
 
-//TODO (stub)
+/* Frees an i_block.
+ * Input:
+ * - Pointer to i_block
+ * Returns: 0 if successful, -1 otherwise
+ */
 int i_block_free(i_block *iblock) {
+    for (int i = 0; i < MAX_SUPPL_REFS; i++) {
+        if (data_block_free(iblock->indexes[i]) == -1)
+            return -1;
+    }
+    free(iblock);
     return 0;
 }
 
