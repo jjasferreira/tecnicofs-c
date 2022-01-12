@@ -32,7 +32,7 @@ FUNCTION 4 - tfs_open(name, flags) -> flags: append mode, truncate file, create 
                                 //truncates if requested 
                                 if inode's size is positive:
                                     frees inode and sets size to 0
-                                if append is requested:
+                                else if append is requested:
                                     changes offset to inode's size
                             else if creation is requested
                                 inode_create();

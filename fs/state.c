@@ -265,6 +265,7 @@ int find_in_dir(int inumber, char const *sub_name) {
 /*
  * Allocated a new data block
  * Returns: block index if successful, -1 otherwise
+ * TODO this is wrong, i variable conflicts
  */
 int data_block_alloc() {
     for (int i = 0; i < DATA_BLOCKS; i++) {
@@ -308,6 +309,14 @@ int data_block_free(inode_t* inode) {
             i_block_free(inode->i_block);
         }
         return 0;
+    }
+}
+
+i_block* i_block_alloc() {
+    i_block* b =  malloc(sizeof(i_block));
+    int ind[MAX_SUPPL_REFS];
+    for (int i = 0; i < MAX_SUPPL_REFS; i++) {
+
     }
 }
 

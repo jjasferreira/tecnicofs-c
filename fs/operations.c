@@ -202,17 +202,39 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         to_read = len;
     }
 
+    int pre_trunc = file->of_offset % BLOCK_SIZE;
+    int post_trunc = to_read % BLOCK_SIZE;
+
     if (to_read > 0) {
+        int read_times = (file->of_offset / BLOCK_SIZE) + 1;
+        for (int i = 0; i < read_times; i++) {
+            void* block = (i >= 10) ? 
+            data_block_get(inode->i_data_blocks[i]) : 
+            i_block_get(i, inode->i_block);
+            if (block == NULL) {
+                return -1;
+            }
+            if (i == 1) // copy from the first block, from the cursor position, to the beginning of the buffer.
+                memcpy(buffer, block + pre_trunc, BLOCK_SIZE - pre_trunc);
+            else if (i < read_times - 1) // copy a BLOCK_SIZE from the i_th block to the i_th portion of the buffer. 
+                memcpy(buffer + i*BLOCK_SIZE, block, BLOCK_SIZE);
+            else // copy from the last block until the EOF to the last BLOCK_SIZE'd portion of the buffer.
+                memcpy(buffer + i*BLOCK_SIZE, block, BLOCK_SIZE - post_trunc);
+        }
+        /*
         void *block = data_block_get(inode->i_data_block);
         if (block == NULL) {
             return -1;
         }
 
-        /* Perform the actual read */
-        memcpy(buffer, block + file->of_offset, to_read);
-        /* The offset associated with the file handle is
-         * incremented accordingly */
-        file->of_offset += to_read;
+        Acho que isto não é preciso lol, 
+        pelo menos não faz sentido que a leitura altere a posição do cursor
+
+        Perform the actual read
+            memcpy(buffer, block + file->of_offset, to_read);
+        The offset associated with the file handle is
+        incremented accordingly
+            file->of_offset += to_read;*/
     }
 
     return (ssize_t)to_read;
