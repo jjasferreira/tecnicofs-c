@@ -8,8 +8,6 @@ int main() {
     char *path = "/f1";
     char buffer[40];
 
-    printf("%d", (int)strlen(str));
-
     assert(tfs_init() != -1);
 
     int f;

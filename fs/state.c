@@ -81,6 +81,12 @@ void state_init() {
 }
 
 void state_destroy() { /* nothing to do */
+    int i = 0;
+    while (true) {
+        inode_t* inode = inode_get(i);
+        if (inode == NULL) break;
+        inode_delete(i++);
+    }
 }
 
 /*
