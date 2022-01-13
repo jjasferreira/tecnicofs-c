@@ -142,7 +142,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         for (int i= first_index; write_times > 0; i++, write_times--) {
             void* block = (i < MAX_DIRECT_REFS) ? 
             data_block_get(inode->i_data_blocks[i]) : 
-            i_block_get(i, inode->i_block);
+            i_block_get(i-MAX_DIRECT_REFS, inode->i_block);
             if (block == NULL)
                 return -1;
             size_t write = (write_times == 1) ? remainder : BLOCK_SIZE;
@@ -211,24 +211,26 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         to_read = len;
     }
 
+    int first_block = (int) file->of_offset / BLOCK_SIZE;
+
     size_t pre_trunc = file->of_offset % BLOCK_SIZE;
     size_t post_trunc = to_read % BLOCK_SIZE;
 
     if (to_read > 0) {
-        size_t read_times = (file->of_offset / BLOCK_SIZE) + 1;
-        for (int i = 0; i < read_times; i++) {
-            void* block = (i < MAX_DIRECT_REFS) ? 
+        int read_times = (int )(to_read / BLOCK_SIZE) + 1;
+        for (int i = first_block, j = 0; i < first_block + read_times; i++, j++) {
+            void* block = (i < MAX_DIRECT_REFS) ?
             data_block_get(inode->i_data_blocks[i]) : 
-            i_block_get(i, inode->i_block);
+            i_block_get(i-MAX_DIRECT_REFS, inode->i_block);
             if (block == NULL) {
                 return -1;
             }
-            if (i == 1) // copy from the first block, from the cursor position, to the beginning of the buffer.
+            if (i == first_block) // copy from the first block, from the cursor position, to the beginning of the buffer.
                 memcpy(buffer, block + pre_trunc, BLOCK_SIZE - pre_trunc);
             else if (i < read_times - 1) // copy a BLOCK_SIZE from the i_th block to the i_th portion of the buffer. 
-                memcpy(buffer + i*BLOCK_SIZE, block, BLOCK_SIZE);
+                memcpy(buffer + j * BLOCK_SIZE, block, BLOCK_SIZE);
             else // copy from the last block until the EOF to the last BLOCK_SIZE'd portion of the buffer.
-                memcpy(buffer + i*BLOCK_SIZE, block, BLOCK_SIZE - post_trunc);
+                memcpy(buffer + j * BLOCK_SIZE, block, BLOCK_SIZE - post_trunc);
         }
         /*
         void *block = data_block_get(inode->i_data_block);
