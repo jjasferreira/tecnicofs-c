@@ -127,17 +127,10 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         to_write = ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE) - file->of_offset;
     }
 
-    int dir_refs, suppl_refs = 0;
     int write_times = (int) (to_write / BLOCK_SIZE) + 1;
     size_t remainder = to_write % BLOCK_SIZE;
 
-    //TODO macro para ficar bonitito
-    if (MAX_DIRECT_REFS < write_times)
-        dir_refs = MAX_DIRECT_REFS;
-    else dir_refs = write_times;
-
-    if (write_times > MAX_DIRECT_REFS)
-        suppl_refs = write_times - MAX_DIRECT_REFS;
+    int first_index = (int)(inode->i_size / BLOCK_SIZE);
 
     if (to_write > 0) {
         if (inode->i_size + to_write > MAX_DIRECT_REFS * BLOCK_SIZE) {
@@ -147,38 +140,55 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
                 return -1;
         }
 
-        // TODO juntar estes dois ciclos num só
-        for (int i = 0; i < dir_refs; i++, write_times--) {
-            // TODO get data block from direct refs if i <10, from iblock elsewise
-            void* block = data_block_get(inode->i_data_blocks[i]);
+        for (int i= first_index; write_times > 0; i++, write_times--) {
+            void* block = (i < MAX_DIRECT_REFS) ? 
+            data_block_get(inode->i_data_blocks[i]) : 
+            i_block_get(i, inode->i_block);
             if (block == NULL)
                 return -1;
-
             size_t write = (write_times == 1) ? remainder : BLOCK_SIZE;
-                /* Perform the actual write */
-                memcpy(block + file->of_offset, buffer, write);
+            if (i == first_index) {
+                memcpy(block + (file->of_offset%BLOCK_SIZE), buffer, write);
                 file->of_offset += write;
-        }
-        for (int i = 0; i < suppl_refs; i++, write_times--) {
-            void* block = i_block_get(i, inode->i_block);
-            if (block == NULL)
-                return -1;
-            if (write_times == 1) {
-                memcpy(block + file->of_offset, buffer, remainder);
-                file->of_offset += remainder;
             } else {
-                memcpy(block + file->of_offset, buffer, BLOCK_SIZE);
-                file->of_offset += BLOCK_SIZE;
+                memcpy(block, buffer, write);
+                file->of_offset += write;
             }
         }
+
+        // TODO juntar estes dois ciclos num só
+        // for (int i = 0; i < dir_refs; i++, write_times--) {
+        //     // TODO get data block from direct refs if i <10, from iblock elsewise
+        //     void* block = data_block_get(inode->i_data_blocks[i]);
+        //     if (block == NULL)
+        //         return -1;
+
+        //     size_t write = (write_times == 1) ? remainder : BLOCK_SIZE;
+        //         /* Perform the actual write */
+        //         memcpy(block + file->of_offset, buffer, write);
+        //         file->of_offset += write;
+        // }
+        // for (int i = 0; i < suppl_refs; i++, write_times--) {
+        //     void* block = i_block_get(i, inode->i_block);
+        //     if (block == NULL)
+        //         return -1;
+        //     if (write_times == 1) {
+        //         memcpy(block + file->of_offset, buffer, remainder);
+        //         file->of_offset += remainder;
+        //     } else {
+        //         memcpy(block + file->of_offset, buffer, BLOCK_SIZE);
+        //         file->of_offset += BLOCK_SIZE;
+        //     }
+        // }
         /* Perform the actual write */
 
         /* The offset associated with the file handle is
          * incremented accordingly
-        file->of_offset += to_write;
+        file->of_offset += to_write;*/
+
         if (file->of_offset > inode->i_size) {
             inode->i_size = file->of_offset;
-        } TODO is this needed?*/
+        }
     }
     return (ssize_t)to_write;
 }
@@ -208,7 +218,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     if (to_read > 0) {
         size_t read_times = (file->of_offset / BLOCK_SIZE) + 1;
         for (int i = 0; i < read_times; i++) {
-            void* block = (i < 10) ? 
+            void* block = (i < MAX_DIRECT_REFS) ? 
             data_block_get(inode->i_data_blocks[i]) : 
             i_block_get(i, inode->i_block);
             if (block == NULL) {

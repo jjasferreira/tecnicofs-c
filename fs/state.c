@@ -171,7 +171,7 @@ int inode_delete(int inumber) {
 }
 
 void* i_block_get(int index, i_block* iblock) {
-    return &iblock[index];
+    return &fs_data[iblock->indexes[index] * BLOCK_SIZE];
 }
 
 /*
@@ -388,7 +388,7 @@ int add_to_open_file_table(int inumber, size_t offset) {
 /* Frees an entry from the open file table
  * Inputs:
  * 	- file handle to free/close
- * Returns 0 is success, -1 otherwise
+ * Returns 0 if successful, -1 otherwise
  */
 int remove_from_open_file_table(int fhandle) {
     if (!valid_file_handle(fhandle) ||
