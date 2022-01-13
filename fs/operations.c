@@ -97,7 +97,6 @@ int tfs_open(char const *name, int flags) {
     } else {
         return -1;
     }
-
     /* Finally, add entry to the open file table and
      * return the corresponding handle */
     return add_to_open_file_table(inum, offset);

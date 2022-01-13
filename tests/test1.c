@@ -1,4 +1,4 @@
-#include "fs/operations.h"
+#include "../fs/operations.h"
 #include <assert.h>
 #include <string.h>
 
@@ -7,6 +7,8 @@ int main() {
     char *str = "AAA!";
     char *path = "/f1";
     char buffer[40];
+
+    printf("%d", (int)strlen(str));
 
     assert(tfs_init() != -1);
 

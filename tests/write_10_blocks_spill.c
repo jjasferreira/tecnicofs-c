@@ -46,7 +46,7 @@ int main() {
     assert(tfs_close(fd) != -1);
 
 
-    printf("Sucessful test\n");
+    printf("write 10 blocks spill: Sucessful test\n");
 
     return 0;
 }

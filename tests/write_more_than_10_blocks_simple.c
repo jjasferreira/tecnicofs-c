@@ -47,7 +47,7 @@ int main() {
     assert(tfs_close(fd) != -1);
 
 
-    printf("Sucessful test\n");
+    printf("write more than 10 blocks simple: Sucessful test\n");
 
     return 0;
 }

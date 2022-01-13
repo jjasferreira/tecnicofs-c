@@ -128,10 +128,9 @@ int inode_create(inode_type n_type) {
                 /* In case of a new file, simply sets its size to 0 */
                 inode_table[inumber].i_size = 0;
                 inode_table[inumber].i_data_block = -1;
-                int b[MAX_DIRECT_REFS];
                 for (int i = 0; i < MAX_DIRECT_REFS; i++) {
-                    b[i] = data_block_alloc();
-                    if (b[i] == -1) {
+                    inode_table[inumber].i_data_blocks[i] = data_block_alloc();
+                    if (inode_table[inumber].i_data_blocks[i] == -1) {
                         freeinode_ts[inumber] = FREE;
                         return -1;
                     }
