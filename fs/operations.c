@@ -248,3 +248,32 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
     return (ssize_t)to_read;
 }
+
+int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
+
+    FILE *fp = fopen(dest_path, "w");
+    int inum = tfs_lookup(source_path);
+    inode_t *inode = inode_get(inum);
+    if (fp == NULL || inode == NULL)
+        return -1;
+    
+    for (int i = 0; i < MAX_DIRECT_REFS; i++) {
+        void* block = data_block_get(inode->i_data_blocks[i]);
+        for (int j = 0; j < BLOCK_SIZE; j++, block++) {
+            if (block == NULL)
+                goto end;
+            fprintf(fp, "%c", block);
+        }
+    }
+    for (int i = 0; i < MAX_SUPPL_REFS; i++) {
+        void* block = data_block_get(inode->i_block->indexes[i]);
+        for (int j = 0; j < BLOCK_SIZE; j++, block++) {
+            if (block == NULL)
+                goto end;
+            fprintf(fp, "%c", block);
+        }
+    }
+    end:
+    fclose(fp);
+    return 0;
+}
