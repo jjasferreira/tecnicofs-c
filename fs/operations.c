@@ -258,19 +258,19 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
         return -1;
     
     for (int i = 0; i < MAX_DIRECT_REFS; i++) {
-        void* block = data_block_get(inode->i_data_blocks[i]);
-        for (int j = 0; j < BLOCK_SIZE; j++, block++) {
+        char* block = data_block_get(inode->i_data_blocks[i]);
+        for (int j = 0; j < BLOCK_SIZE; j++) {
             if (block == NULL)
                 goto end;
-            fprintf(fp, "%c", block);
+            fprintf(fp, "%c", block[j]);
         }
     }
     for (int i = 0; i < MAX_SUPPL_REFS; i++) {
-        void* block = data_block_get(inode->i_block->indexes[i]);
-        for (int j = 0; j < BLOCK_SIZE; j++, block++) {
+        char* block = data_block_get(inode->i_block->indexes[i]);
+        for (int j = 0; j < BLOCK_SIZE; j++) {
             if (block == NULL)
                 goto end;
-            fprintf(fp, "%c", block);
+            fprintf(fp, "%c", block[j]);
         }
     }
     end:
