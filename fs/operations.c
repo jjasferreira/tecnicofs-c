@@ -111,48 +111,44 @@ int tfs_close(int fhandle) { return remove_from_open_file_table(fhandle); }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     open_file_entry_t *file = get_open_file_entry(fhandle);
-    if (file == NULL) {
+    if (file == NULL)
         return -1;
-    }
 
     /* From the open file table entry, we get the inode */
     inode_t *inode = inode_get(file->of_inumber);
-    if (inode == NULL) {
+    if (inode == NULL)
         return -1;
-    }
 
     /* Determine how many bytes to write */
-    if (to_write + file->of_offset > ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE)) {
+    if (to_write + file->of_offset > ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE))
         to_write = ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE) - file->of_offset;
-    }
 
     int write_times = (int) (to_write / BLOCK_SIZE) + 1;
     size_t remainder = to_write % BLOCK_SIZE;
-
     int first_index = (int)(inode->i_size / BLOCK_SIZE);
+    void *new_buffer_pos = (void*)buffer;
 
     if (to_write > 0) {
         if (inode->i_size + to_write > MAX_DIRECT_REFS * BLOCK_SIZE) {
-            /* If empty file, allocate new block */
+            /* If it exceeds direct blocks size, allocate the block */
             inode->i_block = i_block_alloc();
             if (inode->i_block == NULL)
                 return -1;
         }
 
-        for (int i= first_index; write_times > 0; i++, write_times--) {
-            void* block = (i < MAX_DIRECT_REFS) ? 
-            data_block_get(inode->i_data_blocks[i]) : 
-            i_block_get(i-MAX_DIRECT_REFS, inode->i_block);
+        for (int i = first_index; write_times > 0; i++, write_times--) {
+            void* block = (i < MAX_DIRECT_REFS) ? data_block_get(inode->i_data_blocks[i]) : i_block_get(i-MAX_DIRECT_REFS, inode->i_block);
             if (block == NULL)
                 return -1;
-            size_t write = (write_times == 1) ? remainder : BLOCK_SIZE;
-            if (i == first_index) {
-                memcpy(block + (file->of_offset%BLOCK_SIZE), buffer, write);
-                file->of_offset += write;
-            } else {
-                memcpy(block, buffer, write);
-                file->of_offset += write;
-            }
+            /* Last time that we write (remainder) or not? (write normally) */
+            size_t write_size = (write_times == 1) ? remainder : BLOCK_SIZE - (file->of_offset%BLOCK_SIZE);
+
+            if (i == first_index)
+                memcpy(block + (file->of_offset%BLOCK_SIZE), new_buffer_pos, write_size);
+            else
+                memcpy(block, new_buffer_pos, write_size);
+            new_buffer_pos += write_size;
+            file->of_offset += write_size;
         }
 
         // TODO juntar estes dois ciclos num só
@@ -194,22 +190,20 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
+
     open_file_entry_t *file = get_open_file_entry(fhandle);
-    if (file == NULL) {
+    if (file == NULL)
         return -1;
-    }
 
     /* From the open file table entry, we get the inode */
     inode_t *inode = inode_get(file->of_inumber);
-    if (inode == NULL) {
+    if (inode == NULL)
         return -1;
-    }
 
     /* Determine how many bytes to read */
     size_t to_read = inode->i_size - file->of_offset;
-    if (to_read > len) {
+    if (to_read > len)
         to_read = len;
-    }
 
     int first_block = (int) file->of_offset / BLOCK_SIZE;
 
@@ -228,18 +222,16 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
             if (i == first_block) { // copy from the first block, from the cursor position, to the beginning of the buffer.
                 write_amount = (BLOCK_SIZE - pre_trunc > len) ? len : BLOCK_SIZE - pre_trunc;
                 memcpy(buffer, block + pre_trunc, write_amount);
-                len -= write_amount;
             }
-            else if (i < read_times - 1) {// copy a BLOCK_SIZE from the i_th block to the i_th portion of the buffer. 
+            else if (i < read_times - 1) {  // copy a BLOCK_SIZE from the i_th block to the i_th portion of the buffer. 
                 write_amount = (BLOCK_SIZE - pre_trunc > len) ? len : BLOCK_SIZE;
                 memcpy(buffer + j * BLOCK_SIZE, block, write_amount);
-                len -= write_amount;
             }
-            else {// copy from the last block until the EOF to the last BLOCK_SIZE'd portion of the buffer.
+            else {  // copy from the last block until the EOF to the last BLOCK_SIZE'd portion of the buffer.
                 write_amount = (BLOCK_SIZE - pre_trunc > len) ? len : BLOCK_SIZE - post_trunc;
                 memcpy(buffer + j * BLOCK_SIZE, block, write_amount);
-                len -= write_amount;
             }
+            len -= write_amount;
         }
         /*
         void *block = data_block_get(inode->i_data_block);
