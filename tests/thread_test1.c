@@ -6,11 +6,13 @@
 #include <assert.h>
 #include <string.h>
 
+#define THREAD_AMOUNT 4
+
+int count = 0;
+
 void* testfunc(){
-    printf("GG you're awesome\n");
-    char *str = "AAA!";
-    char *path = "/f1";
-    char buffer[40];
+    char *str = "ADS!";
+    char *path = "/d2";
 
     int f;
     ssize_t r;
@@ -22,20 +24,23 @@ void* testfunc(){
     assert(r == strlen(str));
 
     assert(tfs_close(f) != -1);
+    count++;
     return NULL;
 }
 
-int main(int argc, char** argv) {
-    pthread_t tid[4];
+int main() {
+    pthread_t tid[THREAD_AMOUNT];
 
     assert(tfs_init() != -1);
 
-    for (int i; i < 4; ++i) {
-        if (pthread_create (&tid[i], NULL, testfunc, NULL) == 0)
+    for (int i = 0; i < THREAD_AMOUNT; ++i) {
+        if (pthread_create(&tid[i], NULL, testfunc, NULL) != 0)
             exit(EXIT_FAILURE);
     }
-    for (int i; i < 4; ++i) 
+    for (int i = 0; i < THREAD_AMOUNT; ++i) 
         pthread_join(tid[i], NULL);
     tfs_destroy();
+    assert(count==THREAD_AMOUNT);
+    printf("Successful test\n");
     exit(EXIT_SUCCESS);
 }

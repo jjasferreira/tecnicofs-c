@@ -204,15 +204,18 @@ inode_t *inode_get(int inumber) {
  */
 int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
     if (!valid_inumber(inumber) || !valid_inumber(sub_inumber)) {
+        printf("1");
         return -1;
     }
 
     insert_delay(); // simulate storage access delay to i-node with inumber
     if (inode_table[inumber].i_node_type != T_DIRECTORY) {
+        printf("2");
         return -1;
     }
 
     if (strlen(sub_name) == 0) {
+        printf("3");
         return -1;
     }
 
@@ -220,6 +223,7 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
     dir_entry_t *dir_entry =
         (dir_entry_t *)data_block_get(inode_table[inumber].i_data_block);
     if (dir_entry == NULL) {
+        printf("4");
         return -1;
     }
 
@@ -233,6 +237,7 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
         }
     }
 
+    printf("5");
     return -1;
 }
 
