@@ -33,10 +33,10 @@ int main() {
     assert(tfs_init() != -1);
 
     for (int i = 0; i < NUM_THREADS; i++)
-        assert(pthread_create(&tid[i], NULL, testfunc, NULL) != 0);
+        assert(pthread_create(&tid[i], NULL, testfunc, NULL) == 0);
 
     for (int i = 0; i < NUM_THREADS; i++) 
-        assert(pthread_join(tid[i], NULL) != 0);
+        assert(pthread_join(tid[i], NULL) == 0);
     
     assert(tfs_destroy() != -1);
 
