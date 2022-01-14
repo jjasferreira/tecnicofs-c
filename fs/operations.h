@@ -47,7 +47,6 @@ int tfs_lookup(char const *name);
  *    - append mode (TFS_O_APPEND)
  *    - truncate file contents (TFS_O_TRUNC)
  *    - create file if it does not exist (TFS_O_CREAT)
- * @foo Returns file handle
  */
 int tfs_open(char const *name, int flags);
 
@@ -79,7 +78,6 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len);
  */
 ssize_t tfs_read(int fhandle, void *buffer, size_t len);
 
-// Ex.2
 /* Copies the contents of a file that exists in TecnicoFS to the contents
  * of another file in the OS' file system tree (outside TecnicoFS).
  * Returns 0 if successful, -1 otherwise.

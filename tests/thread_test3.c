@@ -9,7 +9,7 @@
 #define COUNT 40
 #define SIZE 250
 #define THREAD_AMOUNT 4
-    
+
 int count = 0;
 
 void* testfunc(){
@@ -27,7 +27,6 @@ void* testfunc(){
     }
     assert(tfs_close(fd) != -1);
 
-    /* Open again to check if contents are as expected */
     fd = tfs_open(path, 0);
     assert(fd != -1 );
 
