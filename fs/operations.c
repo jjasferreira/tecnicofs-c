@@ -123,11 +123,6 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     if (to_write + file->of_offset > ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE))
         to_write = ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE) - file->of_offset;
 
-    int write_times = (int) (to_write / BLOCK_SIZE) + 1;
-    size_t remainder = to_write % BLOCK_SIZE;
-    int first_index = (int)(inode->i_size / BLOCK_SIZE);
-    void *new_buffer_pos = (void*)buffer;
-
     if (to_write > 0) {
         if (inode->i_size + to_write > MAX_DIRECT_REFS * BLOCK_SIZE) {
             /* If it exceeds direct blocks size, allocate the block */
@@ -135,56 +130,46 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             if (inode->i_block == NULL)
                 return -1;
         }
-
-        for (int i = first_index; write_times > 0; i++, write_times--) {
-            void* block = (i < MAX_DIRECT_REFS) ? data_block_get(inode->i_data_blocks[i]) : i_block_get(i-MAX_DIRECT_REFS, inode->i_block);
-            if (block == NULL)
-                return -1;
-            /* Last time that we write (remainder) or not? (write normally) */
-            size_t write_size = (write_times == 1) ? remainder : BLOCK_SIZE - (file->of_offset%BLOCK_SIZE);
-
-            if (i == first_index)
-                memcpy(block + (file->of_offset%BLOCK_SIZE), new_buffer_pos, write_size);
-            else
-                memcpy(block, new_buffer_pos, write_size);
-            new_buffer_pos += write_size;
-            file->of_offset += write_size;
-        }
-
-        // TODO juntar estes dois ciclos num só
-        // for (int i = 0; i < dir_refs; i++, write_times--) {
-        //     // TODO get data block from direct refs if i <10, from iblock elsewise
-        //     void* block = data_block_get(inode->i_data_blocks[i]);
-        //     if (block == NULL)
-        //         return -1;
-
-        //     size_t write = (write_times == 1) ? remainder : BLOCK_SIZE;
-        //         /* Perform the actual write */
-        //         memcpy(block + file->of_offset, buffer, write);
-        //         file->of_offset += write;
-        // }
-        // for (int i = 0; i < suppl_refs; i++, write_times--) {
-        //     void* block = i_block_get(i, inode->i_block);
-        //     if (block == NULL)
-        //         return -1;
-        //     if (write_times == 1) {
-        //         memcpy(block + file->of_offset, buffer, remainder);
-        //         file->of_offset += remainder;
-        //     } else {
-        //         memcpy(block + file->of_offset, buffer, BLOCK_SIZE);
-        //         file->of_offset += BLOCK_SIZE;
-        //     }
-        // }
-        /* Perform the actual write */
-
-        /* The offset associated with the file handle is
-         * incremented accordingly
-        file->of_offset += to_write;*/
-
-        if (file->of_offset > inode->i_size) {
-            inode->i_size = file->of_offset;
-        }
     }
+    int block_index = (int)(inode->i_size / BLOCK_SIZE);
+    char *buffer_pos = (char*)buffer;
+    size_t left_to_write = to_write;
+
+    /* Writing in the data blocks */
+    while (block_index < MAX_DIRECT_REFS) {
+        char* block = data_block_get(inode->i_data_blocks[block_index]);
+        char* block_pos = block + file->of_offset%BLOCK_SIZE;
+        long unsigned int j = 0;
+        while (j < BLOCK_SIZE-file->of_offset%BLOCK_SIZE && left_to_write > 0) {
+            block_pos[j] = buffer_pos[j];
+            left_to_write--;
+            j++;
+        }
+        file->of_offset += j;
+        if (j == BLOCK_SIZE-file->of_offset%BLOCK_SIZE)
+            block_index++;
+        if (left_to_write == 0)
+            goto end;
+    }
+    while (block_index < MAX_SUPPL_REFS) {
+        char* block = data_block_get(inode->i_block->indexes[block_index-MAX_DIRECT_REFS]);
+        char* block_pos = block + file->of_offset%BLOCK_SIZE;
+        long unsigned int j = 0;
+        while (j < BLOCK_SIZE-file->of_offset%BLOCK_SIZE && left_to_write > 0) {
+            block_pos[j] = buffer_pos[j];
+            left_to_write--;
+            j++;
+        }
+        file->of_offset += j;
+        if (j == BLOCK_SIZE-file->of_offset%BLOCK_SIZE)
+            block_index++;
+        if (left_to_write == 0)
+            goto end;
+    }
+    end:
+    if (file->of_offset > inode->i_size)
+        inode->i_size = file->of_offset;
+
     return (ssize_t)to_write;
 }
 
