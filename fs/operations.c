@@ -6,9 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 // @foo operations.c é como o warehouse manager e o state.c é o warehouse em si. 
 // Ex.3 É preciso rever sincronização fina, mutexes e rwlocks
+
+pthread_rwlock_t rwlock;
 
 int tfs_init() {
     state_init();
@@ -40,19 +43,20 @@ int tfs_lookup(char const *name) {
 
     // skip the initial '/' character
     name++;
-
-    return find_in_dir(ROOT_DIR_INUM, name);
+    int res = find_in_dir(ROOT_DIR_INUM, name);
+    return res;
 }
 
 int tfs_open(char const *name, int flags) {
     int inum;
     size_t offset;
+    pthread_rwlock_wrlock(&rwlock);
 
+    
     /* Checks if the path name is valid */
     if (!valid_pathname(name)) {
         return -1;
     }
-
     inum = tfs_lookup(name);
     if (inum >= 0) {
         /* The file already exists */
@@ -65,12 +69,14 @@ int tfs_open(char const *name, int flags) {
         if (flags & TFS_O_TRUNC) {
             if (inode->i_size > 0) {
                 if (data_blocks_free(inode) == -1) {
+                    printf("3\n");
                     return -1;
                 }
                 inode->i_size = 0;
             }
             if (inode->i_block != NULL) {
                 if (i_block_free(inode->i_block) == -1) {
+                    printf("4\n");
                     return -1;
                 }
             }
@@ -86,20 +92,25 @@ int tfs_open(char const *name, int flags) {
         /* Create inode */
         inum = inode_create(T_FILE);
         if (inum == -1) {
+            printf("5\n");
             return -1;
         }
         /* Add entry in the root directory */
         if (add_dir_entry(ROOT_DIR_INUM, inum, name + 1) == -1) {
             inode_delete(inum);
+            printf("6\n");
             return -1;
         }
         offset = 0;
     } else {
+        printf("7\n");
         return -1;
     }
     /* Finally, add entry to the open file table and
      * return the corresponding handle */
-    return add_to_open_file_table(inum, offset);
+    int res = add_to_open_file_table(inum, offset);
+    pthread_rwlock_unlock(&rwlock);
+    return res;
 
     /* Note: for simplification, if file was created with TFS_O_CREAT and there
      * is an error adding an entry to the open file table, the file is not
@@ -107,9 +118,15 @@ int tfs_open(char const *name, int flags) {
 }
 
 
-int tfs_close(int fhandle) { return remove_from_open_file_table(fhandle); }
+int tfs_close(int fhandle) { 
+    pthread_rwlock_wrlock(&rwlock);
+    int res = remove_from_open_file_table(fhandle);
+    pthread_rwlock_unlock(&rwlock);
+    return res; 
+    }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
+    pthread_rwlock_wrlock(&rwlock);
     open_file_entry_t *file = get_open_file_entry(fhandle);
     if (file == NULL)
         return -1;
@@ -123,14 +140,13 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     if (to_write + file->of_offset > ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE))
         to_write = ((MAX_DIRECT_REFS + MAX_SUPPL_REFS)* BLOCK_SIZE) - file->of_offset;
 
-    if (to_write > 0) {
-        if (inode->i_size + to_write > MAX_DIRECT_REFS * BLOCK_SIZE) {
-            /* If it exceeds direct blocks size, allocate the block */
-            inode->i_block = i_block_alloc();
-            if (inode->i_block == NULL)
-                return -1;
-        }
+    if (to_write > 0 && inode->i_block == NULL && inode->i_size + to_write > MAX_DIRECT_REFS * BLOCK_SIZE) {
+        /* If it exceeds direct blocks size, allocate the block */
+        inode->i_block = i_block_alloc();
+        if (inode->i_block == NULL)
+            return -1;
     }
+
     int block_index = (int)(inode->i_size / BLOCK_SIZE);
     char *buffer_pos = (char*)buffer;
     size_t left_to_write = to_write;
@@ -169,13 +185,13 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     end:
     if (file->of_offset > inode->i_size)
         inode->i_size = file->of_offset;
-
+    pthread_rwlock_unlock(&rwlock);
     return (ssize_t)to_write;
 }
 
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
-
+    pthread_rwlock_wrlock(&rwlock);
     open_file_entry_t *file = get_open_file_entry(fhandle);
     if (file == NULL)
         return -1;
@@ -233,12 +249,11 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         incremented accordingly
             file->of_offset += to_read;*/
     }
-
+    pthread_rwlock_unlock(&rwlock);
     return (ssize_t)to_read;
 }
 
 int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
-
     FILE *fp = fopen(dest_path, "w");
     int inum = tfs_lookup(source_path);
     inode_t *inode = inode_get(inum);
