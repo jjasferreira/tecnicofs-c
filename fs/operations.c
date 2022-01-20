@@ -8,16 +8,12 @@
 #include <string.h>
 #include <pthread.h>
 
-// @foo operations.c é como o warehouse manager e o state.c é o warehouse em si. 
-// Ex.3 É preciso rever sincronização fina, mutexes e rwlocks
-
 pthread_rwlock_t rwlock;
 
 int tfs_init() {
     state_init();
 
-    /* create root inode. @foo This is the only time T_DIRECTORY is passed as a parameter 
-    (the FS only has one directory, everything else is a file) */
+    /* create root inode.*/
     int root = inode_create(T_DIRECTORY);
     if (root != ROOT_DIR_INUM) {
         return -1;
@@ -50,7 +46,6 @@ int tfs_lookup(char const *name) {
 int tfs_open(char const *name, int flags) {
     int inum;
     size_t offset;
-    pthread_rwlock_wrlock(&rwlock);
 
     
     /* Checks if the path name is valid */
@@ -69,14 +64,12 @@ int tfs_open(char const *name, int flags) {
         if (flags & TFS_O_TRUNC) {
             if (inode->i_size > 0) {
                 if (data_blocks_free(inode) == -1) {
-                    printf("3\n");
                     return -1;
                 }
                 inode->i_size = 0;
             }
             if (inode->i_block != NULL) {
                 if (i_block_free(inode->i_block) == -1) {
-                    printf("4\n");
                     return -1;
                 }
             }
@@ -92,24 +85,20 @@ int tfs_open(char const *name, int flags) {
         /* Create inode */
         inum = inode_create(T_FILE);
         if (inum == -1) {
-            printf("5\n");
             return -1;
         }
         /* Add entry in the root directory */
         if (add_dir_entry(ROOT_DIR_INUM, inum, name + 1) == -1) {
             inode_delete(inum);
-            printf("6\n");
             return -1;
         }
         offset = 0;
     } else {
-        printf("7\n");
         return -1;
     }
     /* Finally, add entry to the open file table and
      * return the corresponding handle */
     int res = add_to_open_file_table(inum, offset);
-    pthread_rwlock_unlock(&rwlock);
     return res;
 
     /* Note: for simplification, if file was created with TFS_O_CREAT and there
@@ -119,14 +108,11 @@ int tfs_open(char const *name, int flags) {
 
 
 int tfs_close(int fhandle) { 
-    pthread_rwlock_wrlock(&rwlock);
     int res = remove_from_open_file_table(fhandle);
-    pthread_rwlock_unlock(&rwlock);
     return res; 
     }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
-    pthread_rwlock_wrlock(&rwlock);
     open_file_entry_t *file = get_open_file_entry(fhandle);
     if (file == NULL)
         return -1;
@@ -150,7 +136,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     int block_index = (int)(inode->i_size / BLOCK_SIZE);
     char *buffer_pos = (char*)buffer;
     size_t left_to_write = to_write;
-
+    pthread_rwlock_wrlock(&rwlock);
     /* Writing in the data blocks */
     while (block_index < MAX_DIRECT_REFS) {
         char* block = data_block_get(inode->i_data_blocks[block_index]);
@@ -191,7 +177,6 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
-    pthread_rwlock_wrlock(&rwlock);
     open_file_entry_t *file = get_open_file_entry(fhandle);
     if (file == NULL)
         return -1;
@@ -211,6 +196,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     size_t pre_trunc = file->of_offset % BLOCK_SIZE;
     size_t post_trunc = to_read % BLOCK_SIZE;
     size_t write_amount;
+    pthread_rwlock_wrlock(&rwlock);
     if (to_read > 0) {
         int read_times = (int )(to_read / BLOCK_SIZE) + 1;
         for (int i = first_block, j = 0; len > 0 && i < first_block + read_times; i++, j++) {

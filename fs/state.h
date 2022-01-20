@@ -14,14 +14,13 @@
  */
 typedef struct {
     char d_name[MAX_FILE_NAME];
-    // @foo index of corresponding inode in inode table
     int d_inumber;
 } dir_entry_t;
 
 typedef enum { T_FILE, T_DIRECTORY } inode_type;
 
 /*
- * Ex.1 Set of indexes pointing to data blocks. Allocated if need be when tfs_write is called.
+ * Set of indexes pointing to data blocks. Allocated if need be when tfs_write is called.
  */
 typedef struct {
     int indexes[MAX_SUPPL_REFS];
@@ -47,7 +46,6 @@ typedef enum { FREE = 0, TAKEN = 1 } allocation_state_t;
  */
 typedef struct {
     int of_inumber;
-    // @foo cursor position
     size_t of_offset;
 } open_file_entry_t;
 
