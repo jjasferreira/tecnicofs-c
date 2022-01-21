@@ -4,10 +4,20 @@ Código base do projeto de Sistemas Operativos
 LEIC-A/LEIC-T/LETI, DEI/IST/ULisboa 2021-22
 ---------------------------------------------------------------
 
-Consultar o enunciado publicado no site da disciplina.
+Consultar o enunciado publicado no site da disciplina
 
 CHANGE LOG:
 ============
+
+**Versão 4**
+-----------------
+
+Corrigido um erro no teste da função tfs_destroy_after_all_closed.
+
+**Versão 3**
+-----------------
+
+Várias extensões para suportar o desenvolvimento do 2º exercício (consultar o enunciado respetivo).
 
 **Versão 2**
 -----------------
