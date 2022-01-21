@@ -6,41 +6,42 @@
 #include <assert.h>
 #include <string.h>
 
-#define THREAD_AMOUNT 4
+#define NUM_THREADS 4
 
 int count = 0;
 
-void* testfunc(){
-    char *str = "ADS!";
-    char *path = "/d2";
+void* testfunc() {
 
-    int f;
-    ssize_t r;
+    char *str = "ABC!";
+    char *path = "/f1";
 
-    f = tfs_open(path, TFS_O_CREAT);
+    int f = tfs_open(path, TFS_O_CREAT);
     assert(f != -1);
 
-    r = tfs_write(f, str, strlen(str));
+    ssize_t r = tfs_write(f, str, strlen(str));
     assert(r == strlen(str));
 
     assert(tfs_close(f) != -1);
+
     count++;
-    return NULL;
 }
 
 int main() {
-    pthread_t tid[THREAD_AMOUNT];
+
+    pthread_t tid[NUM_THREADS];
 
     assert(tfs_init() != -1);
 
-    for (int i = 0; i < THREAD_AMOUNT; ++i) {
-        if (pthread_create(&tid[i], NULL, testfunc, NULL) != 0)
-            exit(EXIT_FAILURE);
-    }
-    for (int i = 0; i < THREAD_AMOUNT; ++i) 
-        pthread_join(tid[i], NULL);
-    tfs_destroy();
-    assert(count==THREAD_AMOUNT);
+    for (int i = 0; i < NUM_THREADS; i++)
+        assert(pthread_create(&tid[i], NULL, testfunc, NULL) == 0);
+
+    for (int i = 0; i < NUM_THREADS; i++) 
+        assert(pthread_join(tid[i], NULL) == 0);
+    
+    assert(tfs_destroy() != -1);
+
+    assert(count == NUM_THREADS);
+
     printf("Successful test\n");
-    exit(EXIT_SUCCESS);
+    return 0;
 }
