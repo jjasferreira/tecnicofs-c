@@ -8,6 +8,10 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
     int fcli;
     unlink(client_pipe_path);
 
+    char op_code = TFS_OP_CODE_MOUNT + '0';
+    char buffer[MAX_PATH_NAME + 3] = {op_code, ' '};
+    strcat(buffer, client_pipe_path);
+
     if (mkfifo(client_pipe_path, 0777) < 0)
         exit(1);
     //server sends return values to client path.
@@ -15,6 +19,11 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
         exit(1);
     //client writes requests on server pipe path
     open(server_pipe_path, O_WRONLY);
+
+    if (write(fserv, &buffer, MAX_PATH_NAME + 3) return -1;
+    if (read(fcli, &buffer, sizeof(char)) return -1;
+    sscanf(buffer, "%d ", session_id);
+
     close (fcli);
     unlink(client_pipe_path);
     return 0;

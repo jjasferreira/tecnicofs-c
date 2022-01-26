@@ -2,6 +2,7 @@
 #define CLIENT_API_H
 
 #include "common/common.h"
+#include "fs/config.h" //
 #include <sys/types.h>
 
 /*

@@ -49,8 +49,35 @@ int main(int argc, char **argv) {
     // session[session_id] = NULL
     // close desse client_pipe
 
-//char* handle_request() {
-//    switch(OP_code):
-//    case
-//    return results;
-//}
+char* handle_request(char* buffer) {
+    int op_code, session_id;
+    scanf("%d", &op_code);
+    scanf("%d", session_id);
+    switch (op_code) {
+        case TFS_OP_CODE_MOUNT:
+            //TODO write session_id
+            open_session()
+            break;
+        case TFS_OP_CODE_UNMOUNT:
+            close_session
+            break;
+        case TFS_OP_CODE_OPEN:
+            //TODO
+            break;
+        case TFS_OP_CODE_CLOSE:
+            //TODO
+            break;
+        case TFS_OP_CODE_WRITE:
+            //TODO
+            break;
+        case TFS_OP_CODE_READ:
+            //TODO
+            break;
+        case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSE:
+            //TODO
+            break;
+        default:
+            return -1;
+    }
+    return -1;
+}
