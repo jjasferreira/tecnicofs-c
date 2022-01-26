@@ -1,22 +1,29 @@
 #include "tecnicofs_client_api.h"
 #include <fcntl.h>
 
+int session_id;
+
 int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
-    // TODO
+    // TODO - tem que mandar ao servidor o pipe do filho para ele fazer open writeonly
     int fcli;
     unlink(client_pipe_path);
 
     if (mkfifo(client_pipe_path, 0777) < 0)
         exit(1);
-    if ((fcli = open(client_pipe_path, O_WRONLY)) < 0)
+    //server sends return values to client path.
+    if ((fcli = open(client_pipe_path, O_RDONLY)) < 0)
         exit(1);
-    
-    lose (fcli);
+    //client writes requests on server pipe path
+    open(server_pipe_path, O_WRONLY);
+    close (fcli);
     unlink(client_pipe_path);
     return 0;
 }
 
 int tfs_unmount() {
+    /* close_session(session_id) (função implementada no server que limpa o ID na tabela e fecha os pipes) 
+    close dos pipes do server e do cliente*/
+
     /* TODO: Implement this */
     return -1;
 }
@@ -39,6 +46,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     /* TODO: Implement this */
+    //return read(fcli, buf, TAMMSG);
     return -1;
 }
 
