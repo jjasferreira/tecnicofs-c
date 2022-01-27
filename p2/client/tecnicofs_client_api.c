@@ -2,39 +2,42 @@
 #include <fcntl.h>
 
 int session_id;
+int fcli, fserv;
+char op_code;
+char* pipename;
 
 int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
-    // TODO - tem que mandar ao servidor o pipe do filho para ele fazer open writeonly
-    int fcli;
-    unlink(client_pipe_path);
 
-    char op_code = TFS_OP_CODE_MOUNT + '0';
+    pipename = client_pipe_path;
+    unlink(client_pipe_path);
+    op_code = TFS_OP_CODE_MOUNT + '0';
     char buffer[MAX_PATH_NAME + 3] = {op_code, ' '};
     strcat(buffer, client_pipe_path);
 
-    if (mkfifo(client_pipe_path, 0777) < 0)
-        exit(1);
-    //server sends return values to client path.
-    if ((fcli = open(client_pipe_path, O_RDONLY)) < 0)
-        exit(1);
-    //client writes requests on server pipe path
-    open(server_pipe_path, O_WRONLY);
+    if (mkfifo(client_pipe_path, 0777) < 0) return -1;
 
-    if (write(fserv, &buffer, MAX_PATH_NAME + 3) return -1;
-    if (read(fcli, &buffer, sizeof(char)) return -1;
-    sscanf(buffer, "%d ", session_id);
+    if ((fcli = open(client_pipe_path, O_RDONLY)) < 0) return -1;
+    if ((fserv = open(server_pipe_path, O_WRONLY)) < 0) return -1;
 
+    if (write(fserv, &buffer, MAX_PATH_NAME + 3)) return -1;
+    if (read(fcli, &buffer, sizeof(char))) return -1;
+
+    sscanf(buffer, "%d", session_id);
     close (fcli);
     unlink(client_pipe_path);
     return 0;
 }
 
 int tfs_unmount() {
-    /* close_session(session_id) (função implementada no server que limpa o ID na tabela e fecha os pipes) 
-    close dos pipes do server e do cliente*/
 
-    /* TODO: Implement this */
-    return -1;
+    op_code = TFS_OP_CODE_UNMOUNT + '0';
+    char buffer[sizeof(MAX_SESSIONS) + 3] = {op_code, ' '};
+    strcat(buffer, session_id);
+    if (write(fserv, &buffer, sizeof(MAX_SESSIONS) + 3)) return -1;
+    close(fcli);
+    close(fserv);
+    unlink(pipename);
+    return 0;
 }
 
 int tfs_open(char const *name, int flags) {
