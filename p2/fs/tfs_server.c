@@ -2,9 +2,11 @@
 #include <fcntl.h>
 
 char* session[MAX_SESSIONS];
+int fcli[MAX_SESSIONS];
+
 char buffer[MAX_REQUEST_SIZE];
-char results[MAX_REQUEST_SIZE];
-int fserv, fcli;
+char result[MAX_REQUEST_SIZE];
+int fserv;
 
 int main(int argc, char **argv) {
 
@@ -21,11 +23,9 @@ int main(int argc, char **argv) {
     if ((fserv = open(pipename, O_RDONLY)) < 0) exit(1);
     
     while (1) {
-        int n = read(fserv, buffer, sizeof(buffer));
-        if (n <= 0) break;
-        results = handle_request(buffer);
-            //buffer = "OPCODE:session_id:arguments"
-        n = write (fcli, results, size_of(results));
+        if (read(fserv, buffer, sizeof(buffer))) break;
+        if (handle_request(buffer, result)) break;
+        if (write(fcli, result, size_of(result))) break;
     }
     close (fserv);
     unlink(pipename);
@@ -34,11 +34,11 @@ int main(int argc, char **argv) {
 
 int open_session(char const* client_pipe_path) {
 
-    int session_id = try_session();
-    if (session_id != -1)
-        session[session_id] = client_pipe_path;
-        if (fcli = open(client_pipe_path, O_WRONLY) < 0) return -1;
-        return session_id;
+    int s_id = try_session();
+    if (s_id != -1)
+        session[s_id] = client_pipe_path;
+        if (fcli[s_id] = open(client_pipe_path, O_WRONLY) < 0) return -1;
+        return s_id;
     return -1;
 }
     
@@ -54,12 +54,12 @@ int close_session(session_id) {
 
     char* client_pipe_path = session[session_id];
     session[session_id] = NULL;
-    close(fcli);
+    close(fcli[session_id]);
     unlink(client_pipe_path);
     return 0;
 }
 
-char* handle_request(char* buffer) {
+int handle_request(char* buffer, char* result) {
     int op_code, session_id;
     char* client_pipe_path;
     sscanf(buffer, "%d", &op_code);
@@ -68,12 +68,12 @@ char* handle_request(char* buffer) {
         case TFS_OP_CODE_MOUNT:
             sscanf(buffer, "%s", client_pipe_path);
             session_id = open_session(client_pipe_path);
-            if (session_id != -1)
-                if (write(fcli, &session_id, sizeof(int))) return -1;
+            strcat(result, session_id);
             break;
         case TFS_OP_CODE_UNMOUNT:
             sscanf(buffer, "%d", &session_id);
             close_session(session_id);
+            // write
             break;
         case TFS_OP_CODE_OPEN:
             //TODO
@@ -88,10 +88,15 @@ char* handle_request(char* buffer) {
             //TODO
             break;
         case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
-            //TODO
+            sscanf(buffer, "%d", &session_id);
+            int destroyed = tfs_destroy_after_all_closed();
+            strcat(result, destroyed);
+            write(fcli, result, size_of(result));
+            if (destroyed == 0)
+                return 1;
             break;
         default:
             return -1;
     }
-    return -1;
+    return 0;
 }
