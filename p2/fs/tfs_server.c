@@ -54,9 +54,9 @@ int close_session(session_id) {
 
     char* client_pipe_path = session[session_id];
     session[session_id] = NULL;
-    close(fcli[session_id]);
-    unlink(client_pipe_path);
-    return 0;
+    if (close(fcli[session_id])) return -1;
+    if (unlink(client_pipe_path)) return -1;
+    return 0; 
 }
 
 int handle_request(char* buffer, char* result) {
@@ -72,11 +72,12 @@ int handle_request(char* buffer, char* result) {
             break;
         case TFS_OP_CODE_UNMOUNT:
             sscanf(buffer, "%d", &session_id);
-            close_session(session_id);
-            // write
+            int result = close_session(session_id);
+            if (write(fcli, result, size_of(result))) return -1;
             break;
         case TFS_OP_CODE_OPEN:
-            //TODO
+            char *name;
+            sscanf(buffer, "%d %d %s %d", &op_code, &session_id, name, &flags);
             break;
         case TFS_OP_CODE_CLOSE:
             //TODO
