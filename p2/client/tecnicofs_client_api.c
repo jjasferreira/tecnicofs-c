@@ -50,11 +50,11 @@ int tfs_open(char const *name, int flags) {
     sprintf(command ,"%d %d %s %d", op_code, session_id, name, flags);
     if (write(fserv, &command, 4)) return -1;
     if (read(fserv, &result, MAX_FILDES_LEN)) return -1;
-
     return atoi(result);
 }
 
 int tfs_close(int fhandle) {
+    int op_code = TFS_OP_CODE_CLOSE;
     char command[2 + MAX_SESSION_ID_LEN + 1 + MAX_FILDES_LEN + 1];
     char result;
 

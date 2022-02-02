@@ -1,11 +1,11 @@
 #include "operations.h"
+#include "common/aux.h"
 #include <fcntl.h>
 
 char* session[MAX_SESSIONS];
 int fcli[MAX_SESSIONS];
 
 char buffer[MAX_REQUEST_SIZE];
-char result[MAX_REQUEST_SIZE];
 int fserv;
 
 int main(int argc, char **argv) {
@@ -24,8 +24,7 @@ int main(int argc, char **argv) {
     
     while (1) {
         if (read(fserv, buffer, sizeof(buffer))) break;
-        if (handle_request(buffer, result)) break;
-        if (write(fcli, result, size_of(result))) break;
+        if (handle_request(buffer)) break;
     }
     close (fserv);
     unlink(pipename);
@@ -59,25 +58,29 @@ int close_session(session_id) {
     return 0; 
 }
 
-int handle_request(char* buffer, char* result) {
-    int op_code, session_id;
+int handle_request(char* buffer) {
+    int op_code;
     char* client_pipe_path;
     sscanf(buffer, "%d", &op_code);
     buffer++;
     switch (op_code) {
         case TFS_OP_CODE_MOUNT:
             sscanf(buffer, "%s", client_pipe_path);
-            session_id = open_session(client_pipe_path);
-            strcat(result, session_id);
+            char* session_id = itoa(open_session(client_pipe_path));
+            if (write(fcli[session_id], session_id, strlen(session_id))) return -1;
             break;
         case TFS_OP_CODE_UNMOUNT:
+            int session_id;
             sscanf(buffer, "%d", &session_id);
-            int result = close_session(session_id);
-            if (write(fcli, result, size_of(result))) return -1;
+            char* result = itoa(close_session(session_id));
+            if (write(fcli[session_id], result, size_of(result))) return -1;
             break;
         case TFS_OP_CODE_OPEN:
             char *name;
+            int session_id;
             sscanf(buffer, "%d %d %s %d", &op_code, &session_id, name, &flags);
+            char* fildes = itoa(tfs_open(name, flags));
+            write(fcli[session_id], fildes, strlen(fildes));
             break;
         case TFS_OP_CODE_CLOSE:
             //TODO
