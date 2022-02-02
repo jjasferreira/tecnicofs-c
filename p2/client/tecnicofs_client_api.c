@@ -7,65 +7,71 @@ int op_code;
 char* pipename;
 
 int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
-
     pipename = client_pipe_path;
     unlink(client_pipe_path);
+
     op_code = TFS_OP_CODE_MOUNT;
-    char command[4], result;
+    char command[4], result[MAX_SESSION_ID_LENGTH];
     sprintf(command ,"%d %d", op_code, session_id);
 
-    if (mkfifo(client_pipe_path, 0777) < 0) return -1;
+    if (mkfifo(client_pipe_path, 0777) < 0) return -1; // TODO o professor não tinha dito que devíamos tentar outra vez?
 
-    if ((fcli = open(client_pipe_path, O_RDONLY)) < 0) return -1;
+    if ((fcli = open(client_pipe_path, O_RDONLY)) < 0) return -1; 
     if ((fserv = open(server_pipe_path, O_WRONLY)) < 0) return -1;
 
     if (write(fserv, &command, 4)) return -1;
-    if (read(fcli, &result, 1)) return -1;
+    if (read(fcli, &result, MAX_SESSION_ID_LENGTH)) return -1;
 
     if (result == -1)
         return -1;
-    session_id = (int)result;
+    session_id = atoi(result);
     close(fcli);
     return 0;
 }
 
 int tfs_unmount() {
     op_code = TFS_OP_CODE_UNMOUNT;
-    char command[4];
-    char result;
+    char command[2 + MAX_SESSION_ID_LEN + 1];
+
     sprintf(command ,"%d %d", op_code, session_id);
     if (write(fserv, &command, 4)) return -1;
-    close(fcli);
-    close(fserv);
+
+    if (close(fcli)) return -1;
+    if (close(fserv)) return -1;
     unlink(pipename);
     return 0;
 }
 
 int tfs_open(char const *name, int flags) {
     int op_code = TFS_OP_CODE_OPEN;
-    char command[MAX_FILE_NAME + 8];
-    char result;
+    char command[2 + MAX_SESSION_ID_LEN + 1 + MAX_FILE_NAME + 3];
+    char result[MAX_FILDES_LEN];
+
     sprintf(command ,"%d %d %s %d", op_code, session_id, name, flags);
     if (write(fserv, &command, 4)) return -1;
-    if (read(fserv, &result, 1)) return -1;
-    return (int)result;
+    if (read(fserv, &result, MAX_FILDES_LEN)) return -1;
+
+    return atoi(result);
 }
 
 int tfs_close(int fhandle) {
-    char command[7];
+    char command[2 + MAX_SESSION_ID_LEN + 1 + MAX_FILDES_LEN + 1];
     char result;
+
     sprintf(command ,"%d %d %d", op_code, session_id, fhandle);
     if (write(fserv, &command, 7)) return -1;
     if (read(fserv, &result, 1)) return -1;
+
     return (int)result;
 }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
     
     op_code = TFS_OP_CODE_WRITE;
-    int size = 7 + num_digits((int)len) + sizeof(char)*len;
+    ssize_t size = 2 + MAX_SESSION_ID_LEN + 1 + MAX_FILDES_LEN + 1 + num_digits((int)len) + sizeof(char)*len;
     char* command = malloc(size);
     char result;
+
     sprintf(command, "%d %d %d %d %s", op_code, session_id, fhandle, len, buffer);
     if (write(fserv, &command, size)) {
         free(command);
@@ -78,8 +84,9 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
 }
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
-    int size = 7 + num_digits((int)len);
+    int size = 2 + MAX_SESSION_ID_LEN + 1 + MAX_FILDES_LEN + 1 + num_digits((int)len) + 1;
     char* command = malloc(size);
+
     sprintf(command, "%d %d %d %d", op_code, session_id, fhandle, len);
     if (write(fserv, &command, size)) {
         free(command);
@@ -93,8 +100,9 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
 int tfs_shutdown_after_all_closed() {
     op_code = TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED;
-    char command[4];
+    char command[2 + MAX_SESSION_ID_LEN + 1];
     char result;
+
     sprintf(command ,"%d %d", op_code, session_id);
     if (write(fserv, &command, 4)) return -1;
     if (read(fcli, &result, 1)) return -1;

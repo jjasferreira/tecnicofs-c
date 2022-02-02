@@ -1,0 +1,5 @@
+-Dúvidas 
+Como é que detetamos que um cliente está indisponível, para o remover da session table?
+Onde é que guardamos o session id de cada cliente? Na API?
+Dá para bloquear pipes, certo?
+Tamanho máximo de mensagens para o write?
