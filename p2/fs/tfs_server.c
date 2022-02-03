@@ -1,14 +1,20 @@
 #include "operations.h"
-#include "common/aux.h"
 #include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdlib.h>
 
 char* session[MAX_SESSIONS];
 int fcli[MAX_SESSIONS];
 
-char buffer[MAX_REQUEST_SIZE];
 int fserv;
+int handle_request(char* buffer);
+char* itoa(int val, int base);
 
 int main(int argc, char **argv) {
+    char buffer[MAX_REQUEST_SIZE];
 
     if (argc < 2) {
         printf("Please specify the pathname of the server's pipe.\n");
@@ -31,25 +37,25 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-int open_session(char const* client_pipe_path) {
-
-    int s_id = try_session();
-    if (s_id != -1)
-        session[s_id] = client_pipe_path;
-        if (fcli[s_id] = open(client_pipe_path, O_WRONLY) < 0) return -1;
-        return s_id;
-    return -1;
-}
-    
 int try_session() {
-
     for (int i = 0; i < MAX_SESSIONS; i++)
         if (session[i] == NULL)
             return i;
     return -1;
 }
 
-int close_session(session_id) {
+int open_session(char* client_pipe_path) {
+    int s_id = try_session();
+    if (s_id != -1) {
+        session[s_id] = client_pipe_path;
+        fcli[s_id] = open(client_pipe_path, O_WRONLY);
+        if (fcli[s_id] == -1) return -1;
+        return s_id;
+    }
+    return -1;
+}
+
+int close_session(int session_id) {
 
     char* client_pipe_path = session[session_id];
     session[session_id] = NULL;
@@ -59,43 +65,70 @@ int close_session(session_id) {
 }
 
 int handle_request(char* buffer) {
-    int op_code;
-    char* client_pipe_path;
+    int op_code, session_id;
+    char* client_pipe_path, *result, *name, *fhandle, *to_write;
     sscanf(buffer, "%d", &op_code);
     buffer++;
     switch (op_code) {
         case TFS_OP_CODE_MOUNT:
+            client_pipe_path = malloc(MAX_PATH_NAME*sizeof(char));
             sscanf(buffer, "%s", client_pipe_path);
-            char* session_id = itoa(open_session(client_pipe_path));
-            if (write(fcli[session_id], session_id, strlen(session_id))) return -1;
+            session_id = open_session(client_pipe_path);
+            char* id_char = itoa(session_id, 10);
+            free(client_pipe_path);
+            //write result
+            if (write(fcli[session_id], id_char, strlen(id_char))) return -1;
             break;
+
         case TFS_OP_CODE_UNMOUNT:
-            int session_id;
+
             sscanf(buffer, "%d", &session_id);
-            char* result = itoa(close_session(session_id));
-            if (write(fcli[session_id], result, size_of(result))) return -1;
+            result = itoa(close_session(session_id), 10);
+            //write result
+            if (write(fcli[session_id], result, sizeof(char))) return -1;
             break;
         case TFS_OP_CODE_OPEN:
-            char *name;
-            int session_id;
-            sscanf(buffer, "%d %d %s %d", &op_code, &session_id, name, &flags);
-            char* fildes = itoa(tfs_open(name, flags));
-            write(fcli[session_id], fildes, strlen(fildes));
+            int flags;
+            name = malloc(MAX_FILE_NAME*sizeof(char)); //TODO proteger estes mallocs com if -1 try again ou algo do género
+            sscanf(buffer, "%d %s %d", &session_id, name, &flags);
+            fhandle = itoa(tfs_open(name, flags), 10);
+            free(name);
+            //write fhandle
+            write(fcli[session_id], fhandle, strlen(fhandle));
             break;
         case TFS_OP_CODE_CLOSE:
-            //TODO
+            int fildes;
+            sscanf(buffer, "%d %d", &session_id, &fildes);
+            result = itoa(tfs_close(fildes), 10);
+            //write result
+            write(fcli[session_id], result, strlen(result));
             break;
         case TFS_OP_CODE_WRITE:
-            //TODO
+            size_t len;
+            to_write = malloc(MAX_REQUEST_SIZE);
+            sscanf(buffer, "%d %d %lu", &session_id, &fildes, &len);
+            if (read(fserv, buffer, sizeof(buffer))) { 
+                free(to_write);
+                return -1;
+            }
+            sscanf(buffer, "%s", to_write);
+            result = itoa((int)tfs_write(fildes, to_write, len), 10);
+            free(to_write);
+            //write result
+            write(fcli[session_id], result, strlen(result));
             break;
         case TFS_OP_CODE_READ:
-            //TODO
+            sscanf(buffer, "%d %d %lu", &session_id, &fildes, &len);
+            result = itoa((int)tfs_read(fildes, buffer, len), 10);
+            write(fcli[session_id], buffer, len);
             break;
         case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
             sscanf(buffer, "%d", &session_id);
             int destroyed = tfs_destroy_after_all_closed();
-            strcat(result, destroyed);
-            write(fcli, result, size_of(result));
+            result = malloc(8*sizeof(char));
+            strcat(result, destroyed + "");
+            write(fcli[session_id], result, strlen(result));
+            free(result);
             if (destroyed == 0)
                 return 1;
             break;
@@ -103,4 +136,12 @@ int handle_request(char* buffer) {
             return -1;
     }
     return 0;
+}
+
+char* itoa(int val, int base) {
+    static char buf[32] = {0};
+    int i = 30;
+    for (; val && i && (val>-1); --i, val /= base)
+        buf[i] = "0123456789abcdef"[val % base];
+    return &buf[i + 1];
 }
