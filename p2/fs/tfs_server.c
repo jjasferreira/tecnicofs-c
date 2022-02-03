@@ -49,53 +49,57 @@ int open_session(char* client_pipe_path) {
     if (s_id != -1) {
         session[s_id] = client_pipe_path;
         fcli[s_id] = open(client_pipe_path, O_WRONLY);
-        if (fcli[s_id] == -1) return -1;
+        if (fcli[s_id] == -1) {
+            free(client_pipe_path);
+            return -1;
+        }
         return s_id;
     }
+    free(client_pipe_path);
     return -1;
 }
 
 int close_session(int session_id) {
-
     char* client_pipe_path = session[session_id];
     session[session_id] = NULL;
     if (close(fcli[session_id])) return -1;
-    if (unlink(client_pipe_path)) return -1;
-    return 0; 
+    unlink(client_pipe_path);
+    free(client_pipe_path);
+    return 0;
 }
 
 int handle_request(char* buffer) {
     int op_code, session_id;
-    char* client_pipe_path, *result, *name, *fhandle, *to_write;
+    char *client_pipe_path, *result, *name, *fhandle, *to_write;
     sscanf(buffer, "%d", &op_code);
     buffer++;
     switch (op_code) {
         case TFS_OP_CODE_MOUNT:
-            client_pipe_path = malloc(MAX_PATH_NAME*sizeof(char));
+            client_pipe_path = (char*)malloc((MAX_PATH_NAME+1)*sizeof(char));
             sscanf(buffer, "%s", client_pipe_path);
             session_id = open_session(client_pipe_path);
             char* id_char = itoa(session_id, 10);
-            free(client_pipe_path);
             //write result
             if (write(fcli[session_id], id_char, strlen(id_char))) return -1;
             break;
 
         case TFS_OP_CODE_UNMOUNT:
-
             sscanf(buffer, "%d", &session_id);
             result = itoa(close_session(session_id), 10);
             //write result
             if (write(fcli[session_id], result, sizeof(char))) return -1;
             break;
+
         case TFS_OP_CODE_OPEN:
             int flags;
-            name = malloc(MAX_FILE_NAME*sizeof(char)); //TODO proteger estes mallocs com if -1 try again ou algo do género
+            name = (char*)malloc((MAX_FILE_NAME+1)*sizeof(char)); //TODO proteger estes mallocs com if -1 try again ou algo do género
             sscanf(buffer, "%d %s %d", &session_id, name, &flags);
             fhandle = itoa(tfs_open(name, flags), 10);
             free(name);
             //write fhandle
             write(fcli[session_id], fhandle, strlen(fhandle));
             break;
+
         case TFS_OP_CODE_CLOSE:
             int fildes;
             sscanf(buffer, "%d %d", &session_id, &fildes);
@@ -103,9 +107,10 @@ int handle_request(char* buffer) {
             //write result
             write(fcli[session_id], result, strlen(result));
             break;
+
         case TFS_OP_CODE_WRITE:
             size_t len;
-            to_write = malloc(MAX_REQUEST_SIZE);
+            to_write = (char*)malloc(MAX_REQUEST_SIZE + 1);
             sscanf(buffer, "%d %d %lu", &session_id, &fildes, &len);
             if (read(fserv, buffer, sizeof(buffer))) { 
                 free(to_write);
@@ -117,21 +122,24 @@ int handle_request(char* buffer) {
             //write result
             write(fcli[session_id], result, strlen(result));
             break;
+
         case TFS_OP_CODE_READ:
             sscanf(buffer, "%d %d %lu", &session_id, &fildes, &len);
             result = itoa((int)tfs_read(fildes, buffer, len), 10);
             write(fcli[session_id], buffer, len);
             break;
+
         case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
             sscanf(buffer, "%d", &session_id);
             int destroyed = tfs_destroy_after_all_closed();
-            result = malloc(8*sizeof(char));
+            result = (char*)malloc(9*sizeof(char));
             strcat(result, destroyed + "");
             write(fcli[session_id], result, strlen(result));
             free(result);
             if (destroyed == 0)
                 return 1;
             break;
+            
         default:
             return -1;
     }
@@ -141,7 +149,7 @@ int handle_request(char* buffer) {
 char* itoa(int val, int base) {
     static char buf[32] = {0};
     int i = 30;
-    for (; val && i && (val>-1); --i, val /= base)
+    for (; val && i && (val > -1); --i, val /= base)
         buf[i] = "0123456789abcdef"[val % base];
     return &buf[i + 1];
 }
