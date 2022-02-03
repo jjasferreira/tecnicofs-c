@@ -77,14 +77,13 @@ int tfs_close(int fhandle) {
     if (write(fserv, command, c_size) == -1) return -1;
     if (read(fcli, &result, 1) == -1) return -1;
 
-    return (int)result;
+    return atoi(&result);
 }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
-    printf("queijo %s\n", (char*)buffer);
     c_size = (size_t)(2 + MAX_SESSION_ID_LEN + 1 + MAX_FHANDLE_LEN + 1 + num_digits((int)len) + 1);
     char* command = (char*)malloc(c_size);
-    char result;
+    char result[5];
     sprintf(command, "%d %d %d %lu", TFS_OP_CODE_WRITE, session_id, fhandle, len);
 
     if (write(fserv, command, c_size) == -1) {
@@ -93,14 +92,16 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
     }
     free(command);
     if (write(fserv, buffer, len) == -1) return -1;
-    if (read(fcli, &result, 1) == -1) return -1;
+    if (read(fcli, result, 1) == -1) return -1;
 
-    return (int)result;
+    return atoi(result);
 }
 
-ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
+ssize_t tfs_read(int fhandle, char *buffer, size_t len) {
     c_size = (size_t)(2 + MAX_SESSION_ID_LEN + 1 + MAX_FHANDLE_LEN + 1 + num_digits((int)len) + 1);
     char* command = (char*)malloc(c_size);
+    char* result = malloc(5);
+    ssize_t bytes_read;
     sprintf(command, "%d %d %d %lu", TFS_OP_CODE_READ, session_id, fhandle, len);
 
     if (write(fserv, command, c_size) == -1) {
@@ -108,9 +109,13 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         return -1;
     }
     free(command);
-    if (read(fcli, buffer, len) == -1) return -1;
+    if (read(fcli, result, 5) == -1) return -1;
+    printf("Result: %s\n", result);
+    bytes_read = (ssize_t) atoi(result);
+    printf("read: %lu\n", bytes_read);
+    if (read(fcli, buffer, (size_t)bytes_read + 1) == -1) return -1;
     
-    return sizeof(buffer);
+    return bytes_read;
 }
 
 int tfs_shutdown_after_all_closed() {
@@ -122,7 +127,7 @@ int tfs_shutdown_after_all_closed() {
     if (write(fserv, command, c_size) == -1) return -1;
     if (read(fcli, &result, 1) == -1) return -1;
 
-    return (int)result;
+    return atoi(&result);
 }
 
 int num_digits(int n) {

@@ -175,17 +175,26 @@ int handle_tfs_write(char *buffer) {
 
 int handle_tfs_read(char *buffer) {
     int session_id, r, fhandle;
-    size_t len;
+    char *to_read;
+    size_t r_size, len;
 
+    r_size = 5; // len(BLOCK_SIZE) + 1
+    char result[r_size]; // bytes read / -1
+    
     sscanf(buffer, "%d %d %lu", &session_id, &fhandle, &len);
-    char *result = (char*)malloc((len+1) * sizeof(char));
-    r = (int)tfs_read(fhandle, result, len);
-    if (write(fcli[session_id], result, len) == -1) {
-        free(result);
+
+    to_read = (char*)malloc(len + 1);
+    r = (int)tfs_read(fhandle, to_read, len);
+    if (r == -1) return -1;
+
+    strcpy(result, itoa(r, 10));
+    if (write(fcli[session_id], result, r_size) == -1) return -1;
+    to_read[r] = '\0';
+    if (write(fcli[session_id], to_read, (size_t)r + 1) == -1) {
+        free(to_read);
         return -1;
     }
-    free(result);
-    if (r == -1) return -1;
+    free(to_read);
     return 0;
 }
 
