@@ -8,7 +8,7 @@
 #define DATA_BLOCKS (1024)
 #define INODE_TABLE_SIZE (50)
 #define MAX_OPEN_FILES (20)
-#define MAX_FILDES_LEN (2) // TODO talvez mudar isto para client api
+#define MAX_FHANDLE_LEN (2) // TODO talvez mudar isto para client api
 #define MAX_FILE_NAME (40)
 #define MAX_PATH_NAME (100) //
 #define MAX_SESSIONS (10) //
