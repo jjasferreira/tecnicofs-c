@@ -10,7 +10,7 @@
 #define MAX_OPEN_FILES (20)
 #define MAX_FILDES_LEN (2) // TODO talvez mudar isto para client api
 #define MAX_FILE_NAME (40)
-#define MAX_PATH_NAME (40) //
+#define MAX_PATH_NAME (100) //
 #define MAX_SESSIONS (10) //
 #define MAX_SESSION_ID_LEN (1) //
 #define MAX_REQUEST_SIZE (2000) //

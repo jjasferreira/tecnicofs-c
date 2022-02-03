@@ -19,18 +19,28 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
     strcpy(pipename, client_pipe_path);
     unlink(client_pipe_path);
 
-    c_size = 2 + MAX_SESSION_ID_LEN + 1;
+    c_size = 2 + MAX_SESSION_ID_LEN + 1 + MAX_PATH_NAME;
     char command[c_size];
     char result[MAX_SESSION_ID_LEN];
-    sprintf(command, "%d %d", TFS_OP_CODE_MOUNT, session_id);
+    sprintf(command, "%d %s", TFS_OP_CODE_MOUNT, client_pipe_path);
 
     if (mkfifo(client_pipe_path, 0777) < 0) return -1; // TODO o professor não tinha dito que devíamos tentar outra vez?
-    
-    if ((fcli = open(client_pipe_path, O_RDONLY)) < 0) return -1;
-    if ((fserv = open(server_pipe_path, O_WRONLY)) < 0) return -1;
+    printf("Bolacha\n");
+    if ((fserv = open(server_pipe_path, O_WRONLY)) < 0) {
+        printf("1\n");
+        return -1;
+        }
+    if (write(fserv, &command, c_size) == -1) {
+        printf("2\n");
+        return -1;
+        }
+    if ((fcli = open(client_pipe_path, O_RDONLY)) < 0) {
+        printf("3\n");
+        return -1;
+        }
+    printf("Maria\n");
 
-    if (write(fserv, &command, c_size)) return -1;
-    if (read(fcli, &result, MAX_SESSION_ID_LEN)) return -1;
+    if (read(fcli, &result, MAX_SESSION_ID_LEN) == -1) return -1;
 
     session_id = atoi(result);
     if (session_id == -1) return -1;

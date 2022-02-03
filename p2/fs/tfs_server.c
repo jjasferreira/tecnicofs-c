@@ -29,12 +29,21 @@ int main(int argc, char **argv) {
     if ((fserv = open(pipename, O_RDONLY)) < 0) exit(1);
     
     while (1) {
-        if (read(fserv, buffer, sizeof(buffer))) break;
-        if (handle_request(buffer)) break;
+        if (read(fserv, buffer, MAX_REQUEST_SIZE) == -1) {
+            goto failure;
+        }
+
+        if (handle_request(buffer)) goto failure;
     }
     close (fserv);
     unlink(pipename);
     return 0;
+    
+    failure:
+    close (fserv);
+    unlink(pipename);
+    printf("Deu bosta\n");
+    exit(1);
 }
 
 int try_session() {
@@ -80,7 +89,7 @@ int handle_request(char* buffer) {
             session_id = open_session(client_pipe_path);
             char* id_char = itoa(session_id, 10);
             //write result
-            if (write(fcli[session_id], id_char, strlen(id_char))) return -1;
+            if (write(fcli[session_id], id_char, strlen(id_char)) == -1) return -1;
             break;
 
         case TFS_OP_CODE_UNMOUNT:

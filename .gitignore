@@ -53,3 +53,15 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+p2/.vscode/c_cpp_properties.json
+p2/.vscode/settings.json
+p2/fs/tfs_server
+p2/tests/client_server_simple_test
+p2/tests/lib_destroy_after_all_closed_test
+tests/copy_to_external_errors
+tests/copy_to_external_simple
+tests/tt1
+tests/valgrind-out.txt
+tests/write_10_blocks_simple
+tests/write_10_blocks_spill
+tests/write_more_than_10_blocks_simple
