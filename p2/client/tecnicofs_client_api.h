@@ -1,8 +1,8 @@
 #ifndef CLIENT_API_H
 #define CLIENT_API_H
 
-#include "common/common.h"
-#include "fs/config.h" //
+#include "/common/common.h"
+#include "/fs/config.h" //
 #include <sys/types.h>
 
 /*
@@ -71,7 +71,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len);
  * (can be lower than 'len' if the file size was reached), or -1 in case of
  * error.
  */
-ssize_t tfs_read(int fhandle, char *buffer, size_t len);
+ssize_t tfs_read(int fhandle, void *buffer, size_t len);
 
 /*
  * Orders TecnicoFS server to wait until no file is open and then shutdown
