@@ -1,4 +1,4 @@
-#include "client/tecnicofs_client_api.h"
+#include "../client/tecnicofs_client_api.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,13 +22,11 @@ int main(int argc, char **argv) {
         return 1;
     }
     assert(tfs_mount(argv[1], argv[2]) == 0);
-
     f = tfs_open(path, TFS_O_CREAT);
     assert(f != -1);
 
     r = tfs_write(f, str, strlen(str));
-
-    assert(r == strlen(str));
+    assert((size_t)r == strlen(str));
 
     assert(tfs_close(f) != -1);
 

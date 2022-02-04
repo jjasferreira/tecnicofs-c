@@ -5,11 +5,27 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <pthread.h>
+
+pthread_t tasks[MAX_SESSIONS];
+pthread_mutex_t lock;
+pthread_cond_t mayProduce[MAX_SESSIONS], mayReceive[MAX_SESSIONS];
+
+typedef struct {
+    int op_code = NULL;
+    int session_id = NULL;
+    char* txt_info = NULL;
+    int fhandle = NULL;
+    int flags = NULL;
+    size_t len = NULL;
+} parsed_command;
+
+int session_count;
 
 char* session[MAX_SESSIONS];
-int fcli[MAX_SESSIONS];
+int fcli[MAX_SESSIONS]
 int fserv;
-// Handle Commands
+// Haxndle Commands
 int handle_request(char *buffer);
 int handle_tfs_mount(char *buffer);
 int handle_tfs_unmount(char *buffer);
@@ -28,14 +44,24 @@ int main(int argc, char **argv) {
 
     if (argc < 2) {
         printf("Please specify the pathname of the server's pipe.\n");
-        return 1;
+        exit(1);
     }
+    
 
     char *pipename = argv[1];
     printf("Starting TecnicoFS server with pipe called %s\n", pipename);
     tfs_init(); //
     unlink(pipename);
 
+    if (pthread_mutex_init(&lock, 0) != 0)
+        exit(1);
+    for (int i = 0; i < MAX_SESSIONS; ++i) {
+        if (pthread_cond_init(&mayProduce[i], NULL) != 0)
+            exit(1);
+        if (pthread_cond_init(&mayReceive[i], NULL) != 0)
+            exit(1);
+    }
+    
     if (mkfifo(pipename, 0777) < 0) exit(1);
     if ((fserv = open(pipename, O_RDONLY)) < 0) exit(1);
     
@@ -44,10 +70,47 @@ int main(int argc, char **argv) {
         int r = handle_request(buffer);
         if ((r < 0) || (r == 1)) break;
     }
-    if (close(fserv) < 0) return -1;
+    if (close(fserv) < 0) exit(1);
     unlink(pipename);
     return 0;
 }
+
+parsed_command parse_command(char* buffer) {
+    parsed_command* command = (parsed_command*) malloc(sizeof(parsed_command));
+    int op_code
+    sscanf(buffer, "%d ", &op_code);
+    command->op_code = op_code;
+    buffer++;
+    switch (op_code) {
+        case TFS_OP_CODE_MOUNT:
+            command->txt_info = (char*)malloc(MAX_PATH_NAME + 1);
+            sscanf(buffer, "%s", command->txt_info);
+            break;
+        case TFS_OP_CODE_UNMOUNT:
+            sscanf(buffer, "%d", &(command->session_id));
+            break;
+        case TFS_OP_CODE_OPEN:
+            command->txt_info = (char*)malloc(MAX_FILE_NAME + 1);
+            sscanf(buffer, "%d %s %d", &(command->session_id), command->txt_info, &(command->flags));
+            break;
+        case TFS_OP_CODE_CLOSE:
+            sscanf(buffer, "%d %d", &(command->session_id), &(command->fhandle));
+            break;
+        case TFS_OP_CODE_WRITE:
+            sscanf(buffer, "%d %d %lu", &(command->session_id), &(command->fhandle), &(command->len));
+            break;
+        case TFS_OP_CODE_READ:
+            sscanf(buffer, "%d %d %lu", &(command->session_id), &(command->fhandle), &(command->len));
+            break;
+        case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
+            sscanf(buffer, "%d", &(command->session_id));
+            break;   
+        default:
+            return -1;
+    }
+    return 0;
+} 
+
 
 int handle_request(char* buffer) {
     int op_code;
@@ -186,6 +249,7 @@ int open_session(char* client_pipe_path) {
             free(client_pipe_path);
             return -1;
         }
+        session_count++;
         return s_id;
     }
     free(client_pipe_path);
@@ -198,5 +262,6 @@ int close_session(int session_id) {
     if (close(fcli[session_id]) < 0) return -1;
     unlink(client_pipe_path);
     free(client_pipe_path);
+    session_count--;
     return 0;
 }
