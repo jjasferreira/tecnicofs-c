@@ -25,7 +25,7 @@ CFLAGS = -std=c11 -D_POSIX_C_SOURCE=200809L
 CFLAGS += $(INCLUDES)
 
 # Warnings
-CFLAGS += -fdiagnostics-color=always -Wall -Wextra -Wcast-align -Wconversion -Wfloat-equal -Wformat=2 -Wnull-dereference -Wshadow -Wsign-conversion -Wswitch-default -Wswitch-enum -Wundef -Wunreachable-code -Wunused
+CFLAGS += -fdiagnostics-color=always -Wall -Wextra -Wcast-align -Wconversion -Wfloat-equal -Wformat=2 -Wnull-dereference -Wshadow -Wsign-conversion -Wswitch-default -Wswitch-enum -Wundef -Wunreachable-code -Wunused -fsanitize=address
 # Warning suppressions
 CFLAGS += -Wno-sign-compare
 

@@ -4,3 +4,5 @@ Onde é que guardamos o session id de cada cliente? Na API?
 Tamanho máximo de mensagens para o write?
 É necessário definir uma tabela de ficheiros abertos entre todos os clientes no próprio tfs_server?
 Porque é que o programa volta e meia empanca?
+
+Como garantimos que 2 tarefas trabalhadoras distintas não escrevem, por exemplo, para o mesmo ficheiro?
