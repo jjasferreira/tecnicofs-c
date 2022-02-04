@@ -11,6 +11,7 @@
 
 pthread_t tasks[MAX_SESSIONS];
 pthread_mutex_t locks[MAX_SESSIONS];
+pthread_mutex_t command_lock;
 pthread_cond_t mayWork[MAX_SESSIONS], maySend[MAX_SESSIONS];
 
 typedef struct {
@@ -48,8 +49,8 @@ int init_server();
 int destroy_server();
 int try_open(void *pipename, int flags);
 int try_close(int fserv);
-int try_read(int fserv, void *buffer, size_t size);
-int try_write(int fcli, void *result, size_t size);
+int try_read(int fserver, void *buffer, size_t size);
+int try_write(int fclient, void *result, size_t size);
 int try_session();
 int open_session(char* client_pipe_path);
 int close_session(int session_id);
@@ -75,6 +76,7 @@ int main(int argc, char **argv) {
     int session_id;
     while (1) {
         // Reads request, parses command
+        pthread_mutex_lock(&command_lock);
         if (try_read(fserv, buffer, MAX_REQUEST_SIZE) < 0) break;
         command = parse_command(buffer);
 
@@ -126,10 +128,16 @@ parsed_command *parse_command(char* buffer) {
             break;
         case TFS_OP_CODE_WRITE:
             sscanf(buffer, "%d %d %lu", &(command->session_id), &(command->fhandle), &(command->len));
+            char ack = 'y';
+            if (write(fcli[command->session_id], &ack, sizeof(char)) < 0) {
+                pthread_mutex_unlock(&command_lock);
+                return NULL;
+            }
             command->txt_info = (char*)malloc(command->len + 1);
             if (try_read(fserv, command->txt_info, command->len) < 0) {
                 free(command->txt_info);
-                break;
+                pthread_mutex_unlock(&command_lock);
+                return NULL;
             }
             command_buffer[command->session_id] = command;
             break;
@@ -142,8 +150,10 @@ parsed_command *parse_command(char* buffer) {
             command_buffer[command->session_id] = command;
             break;   
         default:
+            pthread_mutex_unlock(&command_lock);
             return NULL;
     }
+    pthread_mutex_unlock(&command_lock);
     return command;
 } 
 
@@ -210,7 +220,7 @@ void *handle_request(void* s_id) {
 
 int handle_tfs_mount(parsed_command* command) {
     int result; // session_id || -1
-    result = open_session(command->txt_info/* client_pipe_path */);
+    result = open_session(command->txt_info); // client_pipe_path
     if (try_write(fcli[result], &result, sizeof(int)) < 0) {
         free(command);
         return -1;
@@ -310,11 +320,13 @@ int init_server() {
         command_buffer[i] = NULL;
         busy[i] = 0;
     }
+    if (pthread_mutex_init(&command_lock, NULL)) return -1;
     return 0;
 }
 
 int destroy_server() {
     for (int i = 0; i < MAX_SESSIONS; i++) {
+        if (pthread_mutex_destroy(&command_lock)) return -1;
         if (pthread_join(tasks[i], NULL)) return -1;
         if (pthread_mutex_destroy(&locks[i])) return -1;
         if (pthread_cond_destroy(&mayWork[i])) return -1;
@@ -346,18 +358,15 @@ int try_close(int fserver) {
 }
 
 int try_read(int fserver, void *buffer, size_t size) {
-    ssize_t r = 0, s = 0;
+    ssize_t r = 0;
     while (1) {
-        s = read(fserver, buffer, size);
-        r += s;
-        if (s == -1 && errno != EINTR)
+        r = read(fserver, buffer, size);
+        if (r == -1 && errno != EINTR)
             return -1;
-        else if (s == 0) {
+        else if (r == 0) {
             if (try_close(fserver) < 0) return -1;
             if ((fserver = try_open(pipename, O_RDONLY)) < 0) return -1;
         }
-        /* else if (r < size)
-            buffer += s; */
         else
             break;
     }
@@ -399,6 +408,8 @@ int open_session(char* client_pipe_path) {
 
 int close_session(int session_id) {
     char* client_pipe_path = session[session_id];
+    busy[session_id] = 0;
+    pthread_cond_signal(&maySend[session_id]);
     session[session_id] = NULL;
     if (try_close(fcli[session_id]) < 0) return -1;
     unlink(client_pipe_path);

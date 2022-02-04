@@ -76,6 +76,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
     c_size = (size_t)(2 + MAX_SESSION_ID_LEN + 1 + MAX_FHANDLE_LEN + 1 + num_digits((int)len) + 1);
     char* command = (char*)malloc(c_size);
     int result; // bytes || -1
+    char ack;
 
     sprintf(command, "%d %d %d %lu", TFS_OP_CODE_WRITE, session_id, fhandle, len);
     if (write(fserv, command, c_size) < 0) {
@@ -83,6 +84,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
         return -1;
     }
     free(command);
+    if (read(fcli, &ack, sizeof(char)) < 0 ) return -1;
     if (write(fserv, buffer, len) < 0) return -1;
     if (read(fcli, &result, sizeof(int)) < 0) return -1;
     return result;
