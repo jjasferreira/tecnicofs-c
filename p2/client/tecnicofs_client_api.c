@@ -18,7 +18,7 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
     pipename = (char*)malloc(strlen(client_pipe_path));
     strcpy(pipename, client_pipe_path);
     unlink(client_pipe_path);
-    if (mkfifo(client_pipe_path, 0777) < 0) return -1; // TODO o professor não tinha dito que devíamos tentar outra vez?
+    if (mkfifo(client_pipe_path, 0777) < 0) return -1;
 
     c_size = 2 + MAX_SESSION_ID_LEN + 1 + MAX_PATH_NAME;
     char command[c_size];

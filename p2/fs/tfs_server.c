@@ -77,23 +77,21 @@ int main(int argc, char **argv) {
         // Reads request, parses command
         if (try_read(fserv, buffer, MAX_REQUEST_SIZE) < 0) break;
         command = parse_command(buffer);
-        /* case TFS_OP_CODE_MOUNT: // TODO should this be multithreaded?
-                if (handle_tfs_mount(command) < 0) return NULL;
-                break; */
+
         if (command == NULL) break;
         if (command->op_code == TFS_OP_CODE_MOUNT) {
             handle_tfs_mount(command);
             continue;
         }
         session_id = command->session_id;
-
-        pthread_mutex_lock(&(locks[session_id]));
+        pthread_mutex_lock(&locks[session_id]);
 
         while (busy[session_id])
             pthread_cond_wait(&maySend[session_id], &locks[session_id]);
         busy[session_id] = 1;
 
         pthread_cond_signal(&mayWork[session_id]);
+
         pthread_mutex_unlock(&locks[session_id]);
     }
     if (try_close(fserv) < 0) exit(1);
@@ -150,8 +148,8 @@ parsed_command *parse_command(char* buffer) {
 } 
 
 void *handle_request(void* s_id) {
+    int session_id = *((int*)s_id);
     while(1) {
-        int session_id = *((int*)s_id);
         pthread_mutex_lock(&locks[session_id]);
         while (!busy[session_id])
             pthread_cond_wait(&mayWork[session_id], &locks[session_id]);
@@ -162,36 +160,51 @@ void *handle_request(void* s_id) {
         int op_code = command->op_code;
         switch (op_code) {
             case TFS_OP_CODE_UNMOUNT:
-                if (handle_tfs_unmount(command) < 0) return NULL;
-                break;
-
+                if (handle_tfs_unmount(command) < 0) {
+                    pthread_mutex_unlock(&locks[session_id]);
+                    return NULL;
+                }
+                goto end;
             case TFS_OP_CODE_OPEN:
-                if (handle_tfs_open(command) < 0) return NULL;
-                break;
-
+                if (handle_tfs_open(command) < 0) {
+                    pthread_mutex_unlock(&locks[session_id]);
+                    return NULL;
+                }
+                goto end;
             case TFS_OP_CODE_CLOSE:
-                if (handle_tfs_close(command) < 0) return NULL;
-                break;
-
+                if (handle_tfs_close(command) < 0) {
+                    pthread_mutex_unlock(&locks[session_id]);
+                    return NULL;
+                }
+                goto end;
             case TFS_OP_CODE_WRITE:
-                if (handle_tfs_write(command) < 0) return NULL;
-                break;
-
+                if (handle_tfs_write(command) < 0) {
+                    pthread_mutex_unlock(&locks[session_id]);
+                    return NULL;
+                }
+                goto end;
             case TFS_OP_CODE_READ:
-                if (handle_tfs_read(command) < 0) return NULL;
-                break;
-
+                if (handle_tfs_read(command) < 0) {
+                    pthread_mutex_unlock(&locks[session_id]);
+                    return NULL;
+                }
+                goto end;
             case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
-                if (handle_tfs_shutdown_after_all_closed(command) < 0) return NULL;
-                break;
-                
+                if (handle_tfs_shutdown_after_all_closed(command) < 0) {
+                    pthread_mutex_unlock(&locks[session_id]);
+                    return NULL;
+                }
+                goto end;
             default:
+                pthread_mutex_unlock(&locks[session_id]);
                 return NULL;
         }
+        end:
         command_buffer[session_id] = NULL;
         pthread_cond_signal(&maySend[session_id]);
         pthread_mutex_unlock(&locks[session_id]);
-    } 
+        busy[session_id] = 0;
+    }
     return NULL;
 }
 
@@ -240,7 +253,7 @@ int handle_tfs_close(parsed_command* command) {
     return 0;
 }
 
-int handle_tfs_write(parsed_command* command) {
+int handle_tfs_write(parsed_command* command) { 
     int session_id = command->session_id, fhandle = command->fhandle, result; // bytes || -1
     size_t len = command->len;
     result = (int)tfs_write(fhandle, command->txt_info, len);
