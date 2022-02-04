@@ -65,8 +65,11 @@ int main(int argc, char **argv) {
     if (mkfifo(pipename, 0777) < 0) exit(1);
     if ((fserv = open(pipename, O_RDONLY)) < 0) exit(1);
     
+    parsed_command command;
     while (1) {
         if (read(fserv, buffer, MAX_REQUEST_SIZE) < 0) break;
+        command = parse_command(buffer);
+        //TODO wait on condition variable to see if request buffer is full
         int r = handle_request(buffer);
         if ((r < 0) || (r == 1)) break;
     }
@@ -112,37 +115,37 @@ parsed_command parse_command(char* buffer) {
 } 
 
 
-int handle_request(char* buffer) {
-    int op_code;
-    sscanf(buffer, "%d ", &op_code);
-    buffer++;
+void* handle_request(parsed_command* command) {
+    int op_code = command->op_code;
+    //TODO wait on condition variable for the session id
+    int session_id = 
     switch (op_code) {
-        case TFS_OP_CODE_MOUNT:
-            if (handle_tfs_mount(buffer) < 0) return -1;
+        case TFS_OP_CODE_MOUNT: // TODO should this be multithreaded?
+            if (handle_tfs_mount(command) < 0) return -1;
             break;
 
         case TFS_OP_CODE_UNMOUNT:
-            if (handle_tfs_unmount(buffer) < 0) return -1;
+            if (handle_tfs_unmount(command) < 0) return -1;
             break;
 
         case TFS_OP_CODE_OPEN:
-            if (handle_tfs_open(buffer) < 0) return -1;
+            if (handle_tfs_open(command) < 0) return -1;
             break;
 
         case TFS_OP_CODE_CLOSE:
-            if (handle_tfs_close(buffer) < 0) return -1;
+            if (handle_tfs_close(command) < 0) return -1;
             break;
 
         case TFS_OP_CODE_WRITE:
-            if (handle_tfs_write(buffer) < 0) return -1;
+            if (handle_tfs_write(command) < 0) return -1;
             break;
 
         case TFS_OP_CODE_READ:
-            if (handle_tfs_read(buffer) < 0) return -1;
+            if (handle_tfs_read(command) < 0) return -1;
             break;
 
         case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
-            if (handle_tfs_shutdown_after_all_closed(buffer) < 0) return -1;
+            if (handle_tfs_shutdown_after_all_closed(command) < 0) return -1;
             break;
             
         default:
@@ -151,51 +154,55 @@ int handle_request(char* buffer) {
     return 0;
 }
 
-int handle_tfs_mount(char *buffer) {
+int handle_tfs_mount(parsed_command* command) {
     int result; // session_id || -1
-    char *client_pipe_path = (char*)malloc(MAX_PATH_NAME + 1);
-
-    sscanf(buffer, "%s", client_pipe_path);
-    result = open_session(client_pipe_path);
-    if (write(fcli[result], &result, sizeof(int)) < 0) return -1;
+    result = open_session(command->txt_info/* client_pipe_path */);
+    if (write(fcli[result], &result, sizeof(int)) < 0) {
+        free(command);
+        return -1;
+    }
+    free(command);
     return 0;
 }
 
-int handle_tfs_unmount(char *buffer) {
-    int session_id, result; // 0 || -1
-
-    sscanf(buffer, "%d", &session_id);
+int handle_tfs_unmount(parsed_command* command) {
+    int result, session_id = command->session_id; // 0 || -1
     result = close_session(session_id);
-    if (write(fcli[session_id], &result, sizeof(int)) < 0) return -1;
+    if (write(fcli[session_id], &result, sizeof(int)) < 0) {
+        free(command);
+        return -1;
+    }
+    free(command);
     return 0;
 }
 
-int handle_tfs_open(char *buffer) {
-    int session_id, flags, result; // fhandle || -1
-    char *name = (char*)malloc(MAX_FILE_NAME + 1); //TODO proteger estes mallocs com if -1 try again?
-
-    sscanf(buffer, "%d %s %d", &session_id, name, &flags);
-    result = tfs_open(name, flags);
-    free(name);
-    if (write(fcli[session_id], &result, sizeof(int)) < 0) return -1;
+int handle_tfs_open(parsed_command* command) {
+    int session_id = command->session_id, flags = command->flags, result; // fhandle || -1
+    result = tfs_open(command->txt_info, flags);
+    if (write(fcli[session_id], &result, sizeof(int)) < 0) {
+        free(command);
+        return -1;
+    }
+    free(command->txt_info);
+    free(command);
     return 0;
 }
 
-int handle_tfs_close(char *buffer) {
-    int session_id, fhandle, result; // 0 || -1
-
-    sscanf(buffer, "%d %d", &session_id, &fhandle);
+int handle_tfs_close(parsed_command* command) {
+    int session_id = command->session_id, fhandle = command->fhandle, result; // 0 || -1
     result = tfs_close(fhandle);
-    if (write(fcli[session_id], &result, sizeof(int)) < 0) return -1;
+    if (write(fcli[session_id], &result, sizeof(int)) < 0) {
+        free(command);
+        return -1;
+    }
+    free(command);
     return 0;
 }
 
-int handle_tfs_write(char *buffer) {
-    int session_id, fhandle, result; // bytes || -1
+int handle_tfs_write(parsed_command* command) {
+    int session_id = command->session_id, fhandle = command->fhandle, result; // bytes || -1
     char *to_write;
-    size_t len;
-
-    sscanf(buffer, "%d %d %lu", &session_id, &fhandle, &len);
+    size_t len = command->len;
     to_write = (char*)malloc(len + 1);
     if (read(fserv, to_write, len) < 0) {
         free(to_write);
@@ -203,16 +210,19 @@ int handle_tfs_write(char *buffer) {
     }
     result = (int)tfs_write(fhandle, to_write, len);
     free(to_write);
-    if (write(fcli[session_id], &result, sizeof(int)) < 0) return -1;
+    if (write(fcli[session_id], &result, sizeof(int)) < 0) {
+        free(command);
+        return -1;
+    }
+    free(command);
     return 0;
 }
 
-int handle_tfs_read(char *buffer) {
-    int session_id, fhandle, result; // bytes || -1
+int handle_tfs_read(parsed_command* command) {
+    int session_id = command->session_id, fhandle = command->fhandle, result; // bytes || -1
     char *to_read;
-    size_t len;
-
-    sscanf(buffer, "%d %d %lu", &session_id, &fhandle, &len);
+    size_t len = command->len;
+    free(command);
     to_read = (char*)malloc(len + 1);
     result = (int)tfs_read(fhandle, to_read, len);
     if (write(fcli[session_id], to_read, len) < 0) {
@@ -220,17 +230,22 @@ int handle_tfs_read(char *buffer) {
         return -1;
     }
     free(to_read);
-    if (write(fcli[session_id], &result, sizeof(int)) < 0) return -1;
+    if (write(fcli[session_id], &result, sizeof(int)) < 0) {
+        return -1;
+    }
     return 0;
 }
 
-int handle_tfs_shutdown_after_all_closed(char *buffer) {
-    int session_id, result; // 0 || -1
+int handle_tfs_shutdown_after_all_closed(parsed_command* command) {
+    int session_id = command->session_id, result; // 0 || -1
 
-    sscanf(buffer, "%d", &session_id);
     result = tfs_destroy_after_all_closed();
-    if (write(fcli[session_id], &result, sizeof(int)) < 0) return -1;
+    if (write(fcli[session_id], &result, sizeof(int)) < 0) {
+        free(command);
+        return -1;
+    }
     if (result == 0) return 1;
+    free(command);
     return 0;
 }
 
