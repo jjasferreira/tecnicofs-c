@@ -13,8 +13,6 @@ pthread_t tasks[MAX_SESSIONS];
 pthread_mutex_t locks[MAX_SESSIONS];
 pthread_cond_t mayWork[MAX_SESSIONS], maySend[MAX_SESSIONS];
 
-int dummy = 0;
-
 typedef struct {
     int op_code;
     int session_id;
@@ -130,8 +128,12 @@ parsed_command *parse_command(char* buffer) {
             break;
         case TFS_OP_CODE_WRITE:
             sscanf(buffer, "%d %d %lu", &(command->session_id), &(command->fhandle), &(command->len));
+            command->txt_info = (char*)malloc(command->len + 1);
+            if (try_read(fserv, command->txt_info, command->len) < 0) {
+                free(command->txt_info);
+                break;
+            }
             command_buffer[command->session_id] = command;
-            printf("Olá: %d %d", command->session_id, command->op_code);
             break;
         case TFS_OP_CODE_READ:
             sscanf(buffer, "%d %d %lu", &(command->session_id), &(command->fhandle), &(command->len));
@@ -155,10 +157,8 @@ void *handle_request(void* s_id) {
             pthread_cond_wait(&mayWork[session_id], &locks[session_id]);
         parsed_command* command = command_buffer[session_id];
         if (command == NULL) {
-            printf("Coiso: %d", session_id);
             exit(1);
         }
-        dummy++;
         int op_code = command->op_code;
         switch (op_code) {
             case TFS_OP_CODE_UNMOUNT:
@@ -242,15 +242,9 @@ int handle_tfs_close(parsed_command* command) {
 
 int handle_tfs_write(parsed_command* command) {
     int session_id = command->session_id, fhandle = command->fhandle, result; // bytes || -1
-    char *to_write;
     size_t len = command->len;
-    to_write = (char*)malloc(len + 1);
-    if (try_read(fserv, to_write, len) < 0) {
-        free(to_write);
-        return -1;
-    }
-    result = (int)tfs_write(fhandle, to_write, len);
-    free(to_write);
+    result = (int)tfs_write(fhandle, command->txt_info, len);
+    free(command->txt_info);
     if (try_write(fcli[session_id], &result, sizeof(int)) < 0) {
         free(command);
         return -1;
@@ -349,8 +343,8 @@ int try_read(int fserver, void *buffer, size_t size) {
             if (try_close(fserver) < 0) return -1;
             if ((fserver = try_open(pipename, O_RDONLY)) < 0) return -1;
         }
-        else if (r < size)
-            buffer += s;
+        /* else if (r < size)
+            buffer += s; */
         else
             break;
     }
